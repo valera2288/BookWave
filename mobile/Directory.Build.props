@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    Pins the MSVC toolset for the generated Windows desktop build.
+    This machine has multiple side-by-side MSVC toolsets (14.40/14.43/14.44)
+    installed; the default v143 toolset (14.43) is missing the ATL headers
+    required by the flutter_secure_storage_windows plugin, while 14.44 has
+    them. MSBuild auto-imports this file for every project under build/windows.
+  -->
+  <PropertyGroup>
+    <VCToolsVersion>14.44.35207</VCToolsVersion>
+  </PropertyGroup>
+</Project>
