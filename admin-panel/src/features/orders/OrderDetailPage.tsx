@@ -36,6 +36,13 @@ export default function OrderDetailPage() {
 
   const handleStatusChange = async (status: OrderStatus) => {
     if (!order || status === order.status) return;
+    // ТЗ: отмена заказа — необратимое действие, нужен запрос подтверждения.
+    if (
+      status !== "paid" &&
+      !window.confirm(`Изменить статус заказа #${order.id} на «${ORDER_STATUS_LABELS[status]}»?`)
+    ) {
+      return;
+    }
     setSavingStatus(true);
     setError(null);
     setStatusSaved(false);

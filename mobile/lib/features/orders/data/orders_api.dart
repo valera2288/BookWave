@@ -23,10 +23,20 @@ class OrdersApi {
     }
   }
 
+  /// Бэкенд отдаёт историю постранично (по 20) — ТЗ требует список всех
+  /// заказов, поэтому собираем все страницы.
   Future<OrderPage> fetchOrders() async {
     try {
-      final response = await _dio.get('/orders/');
-      return OrderPage.fromJson(response.data as Map<String, dynamic>);
+      final orders = <OrderSummary>[];
+      var page = 1;
+      while (true) {
+        final response = await _dio.get('/orders/', queryParameters: {'page': page});
+        final data = response.data as Map<String, dynamic>;
+        orders.addAll(OrderPage.fromJson(data).orders);
+        if (data['next'] == null) break;
+        page += 1;
+      }
+      return OrderPage(orders: orders);
     } on DioException catch (e) {
       throw OrdersException.fromDioError(e);
     }

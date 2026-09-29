@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/domain/app_user.dart';
+import '../../../auth/presentation/ensure_authenticated.dart';
 import '../../../book_details/presentation/screens/book_detail_screen.dart';
 import '../../../cart/presentation/screens/cart_screen.dart';
 import '../../../catalog/domain/book_summary.dart';
+import '../../../catalog/presentation/catalog_controller.dart';
 import '../../../catalog/presentation/catalog_reference_providers.dart';
 import '../../../catalog/presentation/screens/catalog_screen.dart';
 import '../../../favorites/presentation/favorites_controller.dart';
 import '../../../library/presentation/screens/library_screen.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../home_providers.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/book_row.dart';
@@ -18,14 +21,21 @@ import '../widgets/genre_tiles.dart';
 /// и иконка библиотеки (открывает `LibraryScreen` — тот же экран, что и на
 /// вкладке «Библиотека» внизу, второй быстрый вход по образцу корзины),
 /// баннеры, «Новинки», «Топ продаж», «Рекомендуем», «Жанры».
+///
+/// `user == null` — роль «Гость» (ТЗ): та же главная, но без имени в
+/// приветствии, без блока «Рекомендуем» (персонализация требует покупок/
+/// избранного) и с действиями корзины/библиотеки/избранного, уводящими на
+/// экран входа вместо самого действия.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({required this.user, super.key});
 
-  final AppUser user;
+  final AppUser? user;
 
   void _notYetAvailable(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature появится в одной из следующих фаз.')),
+      SnackBar(
+        content: Text(AppLocalizations.of(context)!.notYetAvailableMessage(feature)),
+      ),
     );
   }
 
@@ -36,6 +46,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Future<void> _toggleFavorite(BuildContext context, WidgetRef ref, BookSummary book) async {
+    if (!ensureAuthenticated(context, ref)) return;
     try {
       await ref.read(favoritesControllerProvider.notifier).toggle(book.id);
     } catch (e) {
@@ -45,32 +56,68 @@ class HomeScreen extends ConsumerWidget {
     }
   }
 
+  /// Каталог поверх главной (плитка жанра, баннер-раздел) — со своим
+  /// экземпляром `catalogControllerProvider`, иначе фильтр жанра оставался
+  /// бы висеть на вкладке «Каталог» после возврата.
+  void _openCatalog(BuildContext context, {int? genreId}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProviderScope(
+          overrides: [catalogControllerProvider.overrideWith(CatalogController.new)],
+          child: CatalogScreen(initialGenreId: genreId),
+        ),
+      ),
+    );
+  }
+
+  /// `Banner.link_url` для раздела каталога: `catalog` или `catalog?genre=<id>`.
+  void _openBannerLink(BuildContext context, String linkUrl) {
+    if (linkUrl.startsWith('http')) {
+      // Внешние ссылки требуют url_launcher — пакета в проекте нет.
+      _notYetAvailable(context, AppLocalizations.of(context)!.featureBannerLink);
+      return;
+    }
+    final genreMatch = RegExp(r'genre=(\d+)').firstMatch(linkUrl);
+    _openCatalog(context, genreId: genreMatch == null ? null : int.parse(genreMatch.group(1)!));
+  }
+
+  void _openCart(BuildContext context, WidgetRef ref) {
+    if (!ensureAuthenticated(context, ref)) return;
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CartScreen()));
+  }
+
+  void _openLibrary(BuildContext context, WidgetRef ref) {
+    if (!ensureAuthenticated(context, ref)) return;
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LibraryScreen()));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final bannersAsync = ref.watch(activeBannersProvider);
     final newestAsync = ref.watch(newestBooksProvider);
     final topSellersAsync = ref.watch(topSellersProvider);
-    final recommendationsAsync = ref.watch(recommendationsProvider);
+    // Рекомендации персонализированы (по избранному/покупкам) и на бэкенде
+    // требуют авторизацию (`RecommendationsView`, `permission_classes =
+    // [IsAuthenticated]`) — гостю их не запрашиваем вовсе, не только не
+    // показываем.
+    final recommendationsAsync = user == null ? null : ref.watch(recommendationsProvider);
     final genresAsync = ref.watch(genresProvider);
     final favoriteBookIds = ref.watch(favoritesControllerProvider).valueOrNull ?? const {};
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Здравствуйте, ${user.name}!'),
+        title: Text(user != null ? l10n.homeGreeting(user!.name) : l10n.homeGreetingGuest),
         actions: [
           IconButton(
             icon: const Icon(Icons.menu_book_outlined),
-            tooltip: 'Библиотека',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LibraryScreen()),
-            ),
+            tooltip: l10n.navLibrary,
+            onPressed: () => _openLibrary(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.shopping_cart_outlined),
-            tooltip: 'Корзина',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const CartScreen()),
-            ),
+            tooltip: l10n.navCart,
+            onPressed: () => _openCart(context, ref),
           ),
         ],
       ),
@@ -79,7 +126,7 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(activeBannersProvider);
           ref.invalidate(newestBooksProvider);
           ref.invalidate(topSellersProvider);
-          ref.invalidate(recommendationsProvider);
+          if (user != null) ref.invalidate(recommendationsProvider);
           ref.invalidate(genresProvider);
         },
         child: ListView(
@@ -91,8 +138,8 @@ class HomeScreen extends ConsumerWidget {
                 onTap: (banner) {
                   if (banner.linkBook != null) {
                     _openBook(context, banner.linkBook!);
-                  } else {
-                    _notYetAvailable(context, 'Переход по ссылке баннера');
+                  } else if (banner.linkUrl.isNotEmpty) {
+                    _openBannerLink(context, banner.linkUrl);
                   }
                 },
               ),
@@ -101,7 +148,7 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             newestAsync.maybeWhen(
               data: (books) => BookRow(
-                title: 'Новинки',
+                title: l10n.homeSectionNewest,
                 books: books,
                 onBookTap: (book) => _openBook(context, book.id),
                 favoriteBookIds: favoriteBookIds,
@@ -112,7 +159,7 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             topSellersAsync.maybeWhen(
               data: (books) => BookRow(
-                title: 'Топ продаж',
+                title: l10n.homeSectionTopSellers,
                 books: books,
                 onBookTap: (book) => _openBook(context, book.id),
                 favoriteBookIds: favoriteBookIds,
@@ -120,26 +167,24 @@ class HomeScreen extends ConsumerWidget {
               ),
               orElse: () => const SizedBox.shrink(),
             ),
-            const SizedBox(height: 16),
-            recommendationsAsync.maybeWhen(
-              data: (books) => BookRow(
-                title: 'Рекомендуем',
-                books: books,
-                onBookTap: (book) => _openBook(context, book.id),
-                favoriteBookIds: favoriteBookIds,
-                onFavoriteToggle: (book) => _toggleFavorite(context, ref, book),
+            if (recommendationsAsync != null) ...[
+              const SizedBox(height: 16),
+              recommendationsAsync.maybeWhen(
+                data: (books) => BookRow(
+                  title: l10n.homeSectionRecommended,
+                  books: books,
+                  onBookTap: (book) => _openBook(context, book.id),
+                  favoriteBookIds: favoriteBookIds,
+                  onFavoriteToggle: (book) => _toggleFavorite(context, ref, book),
+                ),
+                orElse: () => const SizedBox.shrink(),
               ),
-              orElse: () => const SizedBox.shrink(),
-            ),
+            ],
             const SizedBox(height: 16),
             genresAsync.maybeWhen(
               data: (genres) => GenreTiles(
                 genres: genres,
-                onGenreTap: (genre) => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CatalogScreen(initialGenreId: genre.id),
-                  ),
-                ),
+                onGenreTap: (genre) => _openCatalog(context, genreId: genre.id),
               ),
               orElse: () => const SizedBox.shrink(),
             ),

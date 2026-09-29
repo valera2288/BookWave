@@ -36,6 +36,12 @@ class PromoCode(models.Model):
         return self.code
 
     def clean(self):
+        # Django-админка вызывает clean() — та же проверка, что в
+        # PromoCodeAdminSerializer.validate_code (поиск идёт по iexact).
+        if self.code and (
+            PromoCode.objects.filter(code__iexact=self.code).exclude(pk=self.pk).exists()
+        ):
+            raise ValidationError({"code": "Промокод с таким кодом уже существует."})
         if self.discount_type == self.DiscountType.PERCENT and self.discount_value and (
             self.discount_value > 100
         ):

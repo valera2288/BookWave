@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 
 from apps.catalog.models import Book
 from apps.catalog.services import annotate_ratings
+from apps.notifications.models import NotificationPreference
+from apps.notifications.services import send_push
 from apps.users.permissions import IsAdminRole
 
 from .export import export_orders_xlsx
@@ -154,6 +156,15 @@ class OrderAdminDetailView(generics.RetrieveUpdateAPIView):
         # write-сериализатора (`{"status": "..."}`) — без этого переопределения
         # фронт получал вместо полного заказа объект без `items`/`buyer_*`
         # и падал на `order.items.map(...)`, теряя уже отрисованные данные.
+        previous_status = self.get_object().status
         super().update(request, *args, **kwargs)
         instance = self.get_object()
+        if instance.status != previous_status:
+            # Push категории «статус заказа» (ТЗ, настройки уведомлений).
+            send_push(
+                instance.user,
+                NotificationPreference.Category.ORDER_STATUS,
+                "Статус заказа изменён",
+                f"Заказ #{instance.id}: {instance.get_status_display()}.",
+            )
         return Response(OrderAdminDetailSerializer(instance).data)

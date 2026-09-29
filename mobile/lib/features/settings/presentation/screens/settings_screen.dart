@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/auth_controller.dart';
 import '../../../notifications/domain/notification_preference.dart';
 import '../../../profile/presentation/screens/change_password_screen.dart';
 
 /// «Настройки» из ТЗ: тема (светлая/тёмная/системная), язык интерфейса
-/// (русский/английский — переключатель сохраняется, но реального перевода
-/// строк пока нет во всём приложении, см. ARCHITECTURE.md, раздел
-/// «Известные ограничения»), push-категории, смена пароля.
+/// (русский/английский, сразу переключает `MaterialApp.locale`),
+/// push-категории, смена пароля.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -69,28 +69,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// Подпись категории приходит с бэкенда только по-русски — переводим по
+  /// коду категории; неизвестная категория — как прислал сервер.
+  String _categoryLabel(NotificationPreference preference, AppLocalizations l10n) =>
+      switch (preference.category) {
+        'new_releases' => l10n.settingsPushNewReleases,
+        'order_status' => l10n.settingsPushOrderStatus,
+        'review_replies' => l10n.settingsPushReviewReplies,
+        _ => preference.label,
+      };
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authControllerProvider).valueOrNull;
     if (user == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Настройки')),
+      appBar: AppBar(title: Text(l10n.profileSettings)),
       body: ListView(
         children: [
-          const _SectionHeader('Оформление'),
+          _SectionHeader(l10n.settingsAppearance),
           RadioGroup<String>(
             groupValue: user.theme,
             onChanged: (value) => _setTheme(value!),
-            child: const Column(
+            child: Column(
               children: [
-                RadioListTile<String>(title: Text('Светлая тема'), value: 'light'),
-                RadioListTile<String>(title: Text('Тёмная тема'), value: 'dark'),
-                RadioListTile<String>(title: Text('Системная тема'), value: 'system'),
+                RadioListTile<String>(title: Text(l10n.settingsThemeLight), value: 'light'),
+                RadioListTile<String>(title: Text(l10n.settingsThemeDark), value: 'dark'),
+                RadioListTile<String>(title: Text(l10n.settingsThemeSystem), value: 'system'),
               ],
             ),
           ),
-          const Divider(height: 1),
+          _SectionHeader(l10n.settingsLanguage),
           RadioGroup<String>(
             groupValue: user.language,
             onChanged: (value) => _setLanguage(value!),
@@ -101,28 +112,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
-          const _SectionHeader('Уведомления'),
+          _SectionHeader(l10n.settingsNotifications),
           if (_preferences != null)
             for (var i = 0; i < _preferences!.length; i++)
               SwitchListTile(
-                title: Text(_preferences![i].label),
+                title: Text(_categoryLabel(_preferences![i], l10n)),
                 value: _preferences![i].enabled,
                 onChanged: (value) => _togglePreference(i, value),
               )
           else if (_loadFailed)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Не удалось загрузить настройки уведомлений'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(l10n.settingsNotificationsLoadError),
             )
           else
             const Padding(
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
-          const _SectionHeader('Аккаунт'),
+          _SectionHeader(l10n.settingsAccount),
           ListTile(
             leading: const Icon(Icons.lock_outline),
-            title: const Text('Сменить пароль'),
+            title: Text(l10n.changePasswordTitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),

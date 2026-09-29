@@ -33,7 +33,30 @@ def _strip_tags(html_bytes: bytes) -> str:
     return _TAG_RE.sub(" ", html_bytes.decode("utf-8", errors="ignore"))
 
 
-def build_epub_excerpt(src_path: Path, ratio: float = 0.12) -> bytes:
+EXCERPT_MIN_RATIO = 0.10
+EXCERPT_MAX_RATIO = 0.15
+
+
+def select_excerpt_count(lengths) -> int:
+    """Сколько первых частей (документов spine / секций FB2) взять во
+    фрагмент, чтобы доля текста попала в 10–15% (ТЗ). Режем только целыми
+    частями, поэтому если следующая часть перескакивает 15%, берём тот из
+    двух вариантов (без неё / с ней), что ближе к диапазону."""
+    total = sum(lengths) or 1
+    low, high = total * EXCERPT_MIN_RATIO, total * EXCERPT_MAX_RATIO
+    count = 0
+    acc = 0
+    for length in lengths:
+        if acc >= low:
+            break
+        if acc > 0 and acc + length > high and (low - acc) < (acc + length - high):
+            break
+        count += 1
+        acc += length
+    return max(count, 1) if lengths else 0
+
+
+def build_epub_excerpt(src_path: Path) -> bytes:
     """Первые ~`ratio` от объёма текста EPUB (по символам содержимого
     spine-документов, не по байтам файла — ТЗ). Копирует исходный zip как
     есть и лишь вырезает документы spine после точки отсечения плюс
@@ -70,15 +93,8 @@ def build_epub_excerpt(src_path: Path, ratio: float = 0.12) -> bytes:
                 text_len = 0
             lengths.append((item_id, text_len))
 
-        total = sum(length for _, length in lengths) or 1
-        target = total * ratio
-        included_ids = set()
-        acc = 0
-        for item_id, text_len in lengths:
-            included_ids.add(item_id)
-            acc += text_len
-            if acc >= target:
-                break
+        keep = select_excerpt_count([length for _, length in lengths])
+        included_ids = {item_id for item_id, _ in lengths[:keep]}
         if not included_ids and spine_ids:
             included_ids = {spine_ids[0]}
 
@@ -127,7 +143,7 @@ def _fb2_tag(name: str, has_ns: bool) -> str:
     return f"{{{_FB2_NS}}}{name}" if has_ns else name
 
 
-def build_fb2_excerpt(src_path: Path, ratio: float = 0.12) -> bytes:
+def build_fb2_excerpt(src_path: Path) -> bytes:
     """`<description>` остаётся целиком (метаданные), из `<body>` — первые
     секции по порядку до достижения `ratio` от суммарной длины текста."""
     tree = ET.parse(src_path)
@@ -142,15 +158,7 @@ def build_fb2_excerpt(src_path: Path, ratio: float = 0.12) -> bytes:
         return Path(src_path).read_bytes()
 
     lengths = [len("".join(section.itertext())) for section in sections]
-    total = sum(lengths) or 1
-    target = total * ratio
-    keep_count = 0
-    acc = 0
-    for length in lengths:
-        keep_count += 1
-        acc += length
-        if acc >= target:
-            break
+    keep_count = select_excerpt_count(lengths)
 
     for section in sections[keep_count:]:
         body.remove(section)

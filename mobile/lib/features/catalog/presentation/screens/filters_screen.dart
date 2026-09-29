@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/catalog_filters.dart';
 import '../catalog_reference_providers.dart';
+import '../language_label.dart';
 
 const _priceSliderMax = 10000.0;
 
@@ -51,24 +53,25 @@ class _FiltersScreenState extends ConsumerState<FiltersScreen> {
   Widget build(BuildContext context) {
     final genresAsync = ref.watch(genresProvider);
     final languagesAsync = ref.watch(languagesProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Фильтры'),
+        title: Text(l10n.catalogFiltersTooltip),
         actions: [
-          TextButton(onPressed: _reset, child: const Text('Сбросить')),
+          TextButton(onPressed: _reset, child: Text(l10n.filtersReset)),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Жанр', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.filtersGenreLabel, style: Theme.of(context).textTheme.titleMedium),
           genresAsync.when(
             loading: () => const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (_, _) => const Text('Не удалось загрузить жанры'),
+            error: (_, _) => Text(l10n.filtersGenresLoadError),
             // ТЗ: выбор жанра — чекбоксы, не чипы.
             data: (genres) => Column(
               children: [
@@ -90,7 +93,7 @@ class _FiltersScreenState extends ConsumerState<FiltersScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Text('Цена, ₽', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.filtersPriceLabel, style: Theme.of(context).textTheme.titleMedium),
           RangeSlider(
             min: 0,
             max: _priceSliderMax,
@@ -110,17 +113,17 @@ class _FiltersScreenState extends ConsumerState<FiltersScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          Text('Язык', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.filtersLanguageLabel, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           languagesAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const Text('Не удалось загрузить список языков'),
+            error: (_, _) => Text(l10n.filtersLanguagesLoadError),
             data: (languages) => Wrap(
               spacing: 8,
               children: [
                 for (final language in languages)
                   ChoiceChip(
-                    label: Text(language),
+                    label: Text(languageDisplayName(language, l10n)),
                     selected: _language == language,
                     onSelected: (selected) =>
                         setState(() => _language = selected ? language : null),
@@ -129,7 +132,7 @@ class _FiltersScreenState extends ConsumerState<FiltersScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Text('Минимальный рейтинг', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.filtersMinRatingLabel, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -151,7 +154,7 @@ class _FiltersScreenState extends ConsumerState<FiltersScreen> {
             ],
           ),
           const SizedBox(height: 32),
-          FilledButton(onPressed: _apply, child: const Text('Применить')),
+          FilledButton(onPressed: _apply, child: Text(l10n.filtersApply)),
         ],
       ),
     );

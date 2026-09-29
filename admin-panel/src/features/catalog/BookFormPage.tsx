@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { extractErrorDetail } from "../../shared/apiTypes";
 import { createBook, fetchAuthors, fetchBook, fetchGenres, updateBook } from "./api";
+import { LANGUAGE_OPTIONS } from "./languageLabel";
 import type { Author, Genre } from "./types";
 
 function appendFile(formData: FormData, key: string, file: File | null) {
@@ -96,6 +97,10 @@ export default function BookFormPage() {
       setError("Файл в формате EPUB обязателен.");
       return;
     }
+    if (!isEditing && !coverFile) {
+      setError("Обложка обязательна.");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("title", title);
@@ -180,7 +185,16 @@ export default function BookFormPage() {
         <div className="form-row">
           <label className="field">
             <span>Язык</span>
-            <input value={language} onChange={(e) => setLanguage(e.target.value)} required />
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} required>
+              {!LANGUAGE_OPTIONS.some((o) => o.value === language) && (
+                <option value={language}>{language}</option>
+              )}
+              {LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span>Издательство</span>
@@ -227,11 +241,12 @@ export default function BookFormPage() {
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            required
           />
         </label>
 
         <label className="field">
-          <span>Обложка (JPG/PNG, до 5 МБ)</span>
+          <span>Обложка (JPG/PNG, до 5 МБ){!isEditing && " (обязательно)"}</span>
           <input type="file" accept="image/jpeg,image/png" onChange={handleFileChange(setCoverFile)} />
           {existingCover && !coverFile && (
             <a className="current-file" href={existingCover} target="_blank" rel="noreferrer">

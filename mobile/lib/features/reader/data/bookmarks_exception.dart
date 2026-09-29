@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/current_locale.dart';
+import '../../../l10n/app_localizations.dart';
+
 class BookmarksException implements Exception {
   BookmarksException(this.message);
 
@@ -10,7 +13,7 @@ class BookmarksException implements Exception {
     if (data is Map && data['detail'] is String) {
       return BookmarksException(data['detail'] as String);
     }
-    return BookmarksException('Не удалось обновить закладки. Проверьте соединение.');
+    return BookmarksException(lookupAppLocalizations(currentAppLocale).exceptionBookmarksGeneric);
   }
 
   @override

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/data/auth_exception.dart';
 import '../../../auth/domain/app_user.dart';
 import '../../../auth/presentation/auth_controller.dart';
@@ -48,7 +49,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           );
       await ref.read(authControllerProvider.notifier).refreshUser();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Профиль обновлён')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.editProfileSaved)),
+      );
       Navigator.of(context).pop();
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -59,11 +62,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _changeEmail() async {
+    final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
     final newEmail = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Новый e-mail'),
+        title: Text(l10n.editProfileNewEmailTitle),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.emailAddress,
@@ -72,11 +76,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Отмена'),
+            child: Text(l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('Отправить'),
+            child: Text(l10n.authSend),
           ),
         ],
       ),
@@ -86,7 +90,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       await ref.read(authRepositoryProvider).requestEmailChange(newEmail);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Письмо с подтверждением отправлено на новый адрес')),
+        SnackBar(content: Text(l10n.editProfileEmailChangeSent)),
       );
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -102,8 +106,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Редактирование профиля')),
+      appBar: AppBar(title: Text(l10n.editProfileTitle)),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -143,10 +148,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Имя'),
+                      decoration: InputDecoration(labelText: l10n.authNameLabel),
                       validator: (value) {
                         final length = value?.trim().length ?? 0;
-                        if (length < 2 || length > 50) return 'От 2 до 50 символов';
+                        if (length < 2 || length > 50) return l10n.editProfileNameLengthError;
                         return null;
                       },
                     ),
@@ -158,7 +163,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         labelText: 'E-mail',
                         suffixIcon: TextButton(
                           onPressed: _changeEmail,
-                          child: const Text('Изменить'),
+                          child: Text(l10n.editProfileChangeEmail),
                         ),
                       ),
                     ),
@@ -171,7 +176,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Сохранить'),
+                          : Text(l10n.reviewSave),
                     ),
                   ],
                 ),

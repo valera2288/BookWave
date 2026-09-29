@@ -1,15 +1,21 @@
+import '../../../l10n/app_localizations.dart';
 import '../../catalog/domain/book_summary.dart';
 
 /// Значения соответствуют `Order.Status` в `apps/orders/models.py`.
 enum OrderStatus {
-  paid('paid', 'Оплачен'),
-  cancelled('cancelled', 'Отменён'),
-  refunded('refunded', 'Возврат');
+  paid('paid'),
+  cancelled('cancelled'),
+  refunded('refunded');
 
-  const OrderStatus(this.apiValue, this.label);
+  const OrderStatus(this.apiValue);
 
   final String apiValue;
-  final String label;
+
+  String label(AppLocalizations l10n) => switch (this) {
+        OrderStatus.paid => l10n.orderStatusPaid,
+        OrderStatus.cancelled => l10n.orderStatusCancelled,
+        OrderStatus.refunded => l10n.orderStatusRefunded,
+      };
 
   factory OrderStatus.fromApiValue(String value) => OrderStatus.values.firstWhere(
         (status) => status.apiValue == value,

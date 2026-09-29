@@ -3,7 +3,14 @@ from decimal import Decimal
 from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 
-from .validators import validate_book_file_size, validate_cover_file, validate_publication_year
+from .validators import (
+    validate_book_file_size,
+    validate_cover_file,
+    validate_epub_file,
+    validate_fb2_file,
+    validate_pdf_file,
+    validate_publication_year,
+)
 
 
 class Author(models.Model):
@@ -44,23 +51,21 @@ class Book(models.Model):
     price = models.DecimalField(
         max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))]
     )
-    description = models.TextField(blank=True)
-    cover = models.ImageField(
-        upload_to="covers/", validators=[validate_cover_file], null=True, blank=True
-    )
+    description = models.TextField()
+    cover = models.ImageField(upload_to="covers/", validators=[validate_cover_file])
     epub_file = models.FileField(
         upload_to="books/epub/",
-        validators=[FileExtensionValidator(["epub"]), validate_book_file_size],
+        validators=[FileExtensionValidator(["epub"]), validate_book_file_size, validate_epub_file],
     )
     pdf_file = models.FileField(
         upload_to="books/pdf/",
-        validators=[FileExtensionValidator(["pdf"]), validate_book_file_size],
+        validators=[FileExtensionValidator(["pdf"]), validate_book_file_size, validate_pdf_file],
         null=True,
         blank=True,
     )
     fb2_file = models.FileField(
         upload_to="books/fb2/",
-        validators=[FileExtensionValidator(["fb2"]), validate_book_file_size],
+        validators=[FileExtensionValidator(["fb2"]), validate_book_file_size, validate_fb2_file],
         null=True,
         blank=True,
     )

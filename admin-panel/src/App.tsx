@@ -13,14 +13,17 @@ import PromoListPage from "./features/promo/PromoListPage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ReviewsPage from "./features/reviews/ReviewsPage";
 import Layout from "./shared/Layout";
+import { useTheme } from "./shared/useTheme";
 
 function App() {
+  const { theme, setTheme } = useTheme();
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAdmin />}>
-          <Route element={<Layout />}>
+          <Route element={<Layout theme={theme} setTheme={setTheme} />}>
             <Route path="/" element={<Navigate to="/orders" replace />} />
             <Route path="/orders" element={<OrdersListPage />} />
             <Route path="/orders/:id" element={<OrderDetailPage />} />

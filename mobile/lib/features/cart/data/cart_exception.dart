@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/current_locale.dart';
+import '../../../l10n/app_localizations.dart';
+
 class CartException implements Exception {
   CartException(this.message);
 
@@ -10,7 +13,7 @@ class CartException implements Exception {
     if (data is Map && data['detail'] is String) {
       return CartException(data['detail'] as String);
     }
-    return CartException('Не удалось обновить корзину. Проверьте соединение.');
+    return CartException(lookupAppLocalizations(currentAppLocale).exceptionCartGeneric);
   }
 
   @override

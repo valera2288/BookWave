@@ -4,7 +4,12 @@ from xml.etree import ElementTree as ET
 from django.core.management.base import BaseCommand
 
 from apps.catalog.models import Book
-from apps.files.services import _strip_tags
+from apps.files.services import (
+    EXCERPT_MAX_RATIO,
+    EXCERPT_MIN_RATIO,
+    _strip_tags,
+    select_excerpt_count,
+)
 
 _NS = {
     "container": "urn:oasis:names:tc:opendocument:xmlns:container",
@@ -14,8 +19,8 @@ _NS = {
 
 class Command(BaseCommand):
     """Диагностика: для каждой активной книги с EPUB — сколько spine-пунктов
-    попадёт во фрагмент и какая доля текста это реально даёт. Флагует книги,
-    где фрагмент фактически близок к полному тексту (мало пунктов spine)."""
+    попадёт во фрагмент и какая доля текста это реально даёт (тот же выбор,
+    что в build_epub_excerpt). Флагует книги вне 10–15% (ТЗ)."""
 
     help = "Проверяет долю текста, попадающую во фрагмент EPUB, по всему каталогу"
 
@@ -55,17 +60,10 @@ class Command(BaseCommand):
                         lengths.append(length)
 
                     total = sum(lengths) or 1
-                    target = total * 0.12
-                    included = 0
-                    acc = 0
-                    for length in lengths:
-                        included += 1
-                        acc += length
-                        if acc >= target:
-                            break
-
-                    ratio = acc / total
-                    flag = " <-- CHECK" if ratio > 0.3 or included >= len(spine_ids) else ""
+                    included = select_excerpt_count(lengths)
+                    ratio = sum(lengths[:included]) / total
+                    in_range = EXCERPT_MIN_RATIO <= round(ratio, 2) <= EXCERPT_MAX_RATIO
+                    flag = "" if in_range and included < len(spine_ids) else " <-- CHECK"
                     self.stdout.write(
                         f"book={book.id} spine={len(spine_ids)} included={included} "
                         f"text_ratio={ratio:.2f}{flag}"

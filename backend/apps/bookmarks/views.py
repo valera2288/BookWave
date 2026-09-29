@@ -23,7 +23,8 @@ class BookmarkListCreateView(generics.ListCreateAPIView):
         queryset = Bookmark.objects.filter(user=self.request.user)
         book_id = self.request.query_params.get("book_id")
         if book_id:
-            queryset = queryset.filter(book_id=book_id)
+            # Нечисловой book_id — просто пустой список, а не 500 от ORM.
+            queryset = queryset.filter(book_id=book_id) if book_id.isdigit() else queryset.none()
         return queryset
 
     def perform_create(self, serializer):

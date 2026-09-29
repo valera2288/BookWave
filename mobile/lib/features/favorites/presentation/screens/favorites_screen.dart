@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../book_details/presentation/screens/book_detail_screen.dart';
 import '../../../catalog/domain/book_summary.dart';
 import '../../../catalog/presentation/widgets/book_card.dart';
@@ -20,27 +21,28 @@ class FavoritesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final favoritesAsync = ref.watch(_favoritesListProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Избранное')),
+      appBar: AppBar(title: Text(l10n.favoritesTitle)),
       body: favoritesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Не удалось загрузить избранное'),
+              Text(l10n.favoritesLoadError),
               const SizedBox(height: 8),
               FilledButton(
                 onPressed: () => ref.invalidate(_favoritesListProvider),
-                child: const Text('Повторить'),
+                child: Text(l10n.commonRetry),
               ),
             ],
           ),
         ),
         data: (books) {
           if (books.isEmpty) {
-            return const Center(child: Text('Пока нет книг в избранном'));
+            return Center(child: Text(l10n.favoritesEmpty));
           }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_favoritesListProvider),

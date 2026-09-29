@@ -1,3 +1,5 @@
+import '../../../l10n/app_localizations.dart';
+
 /// Настройки читалки (ТЗ: шрифт — не менее 5 градаций, тема — светлая/
 /// тёмная/сепия, постраничная/непрерывная навигация на выбор). Хранятся
 /// локально на устройстве, не синхронизируются с сервером — это личные
@@ -30,14 +32,19 @@ class ReaderSettings {
 }
 
 enum ReaderThemeMode {
-  light('light', 'Светлая'),
-  dark('dark', 'Тёмная'),
-  sepia('sepia', 'Сепия');
+  light('light'),
+  dark('dark'),
+  sepia('sepia');
 
-  const ReaderThemeMode(this.storageValue, this.label);
+  const ReaderThemeMode(this.storageValue);
 
   final String storageValue;
-  final String label;
+
+  String label(AppLocalizations l10n) => switch (this) {
+        ReaderThemeMode.light => l10n.readerThemeLight,
+        ReaderThemeMode.dark => l10n.readerThemeDark,
+        ReaderThemeMode.sepia => l10n.readerThemeSepia,
+      };
 
   factory ReaderThemeMode.fromStorage(String value) => ReaderThemeMode.values.firstWhere(
         (mode) => mode.storageValue == value,

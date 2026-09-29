@@ -101,11 +101,14 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "ru"
-TIME_ZONE = "UTC"
+# Даты по-прежнему хранятся в UTC (USE_TZ), но границы суток в отчётах о
+# продажах и фильтре заказов по датам считаются в поясе магазина.
+TIME_ZONE = os.getenv("TIME_ZONE", "Europe/Moscow")
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Локальное файловое хранилище (см. ARCHITECTURE.md — S3 отложен)
 MEDIA_URL = "media/"

@@ -104,7 +104,11 @@ class LoginView(TokenObtainPairView):
         try:
             response = super().post(request, *args, **kwargs)
         except APIException:
-            _increment_attempts(cache_key, LOGIN_LOCKOUT_SECONDS)
+            attempts = _increment_attempts(cache_key, LOGIN_LOCKOUT_SECONDS)
+            if attempts >= LOGIN_ATTEMPT_LIMIT:
+                # TTL ключа отсчитывается от первой ошибки — без переустановки
+                # блокировка длилась бы остаток этого окна, а не 60 с (ТЗ).
+                cache.set(cache_key, attempts, timeout=LOGIN_LOCKOUT_SECONDS)
             raise
 
         cache.delete(cache_key)
@@ -161,7 +165,7 @@ class PasswordResetRequestView(APIView):
             )
         _increment_attempts(cache_key, PASSWORD_RESET_REQUEST_WINDOW_SECONDS)
 
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
         if user:
             send_password_reset_email(user)
         return Response({"detail": "Если e-mail зарегистрирован, письмо отправлено."})

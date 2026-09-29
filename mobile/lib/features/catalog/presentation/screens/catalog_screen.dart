@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../l10n/app_localizations.dart';
+import '../../../auth/presentation/ensure_authenticated.dart';
 import '../../../book_details/presentation/screens/book_detail_screen.dart';
 import '../../../favorites/presentation/favorites_controller.dart';
 import '../../domain/book_summary.dart';
@@ -10,6 +12,7 @@ import '../../domain/catalog_filters.dart';
 import '../../domain/catalog_sort.dart';
 import '../catalog_controller.dart';
 import '../catalog_reference_providers.dart';
+import '../language_label.dart';
 import '../widgets/book_card.dart';
 import 'filters_screen.dart';
 
@@ -81,25 +84,26 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(catalogControllerProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Каталог'),
+        title: Text(l10n.navCatalog),
         actions: [
           PopupMenuButton<CatalogSort>(
             icon: const Icon(Icons.sort),
-            tooltip: 'Сортировка',
+            tooltip: l10n.catalogSortTooltip,
             initialValue: state.filters.sort,
             onSelected: (sort) =>
                 ref.read(catalogControllerProvider.notifier).setSort(sort),
             itemBuilder: (context) => [
               for (final sort in CatalogSort.values)
-                PopupMenuItem(value: sort, child: Text(sort.label)),
+                PopupMenuItem(value: sort, child: Text(sort.label(l10n))),
             ],
           ),
           IconButton(
             icon: const Icon(Icons.filter_list),
-            tooltip: 'Фильтры',
+            tooltip: l10n.catalogFiltersTooltip,
             onPressed: () => _openFilters(state.filters),
           ),
         ],
@@ -110,10 +114,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
               controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Название, автор, ISBN',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                hintText: l10n.catalogSearchHint,
+                prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
               onChanged: _onSearchChanged,
@@ -134,6 +138,7 @@ class _CatalogBody extends ConsumerWidget {
   final ScrollController scrollController;
 
   Future<void> _toggleFavorite(BuildContext context, WidgetRef ref, BookSummary book) async {
+    if (!ensureAuthenticated(context, ref)) return;
     try {
       await ref.read(favoritesControllerProvider.notifier).toggle(book.id);
     } catch (e) {
@@ -148,6 +153,7 @@ class _CatalogBody extends ConsumerWidget {
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final l10n = AppLocalizations.of(context)!;
     if (state.error != null && state.books.isEmpty) {
       return Center(
         child: Column(
@@ -157,14 +163,14 @@ class _CatalogBody extends ConsumerWidget {
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => ref.invalidate(catalogControllerProvider),
-              child: const Text('Повторить'),
+              child: Text(l10n.commonRetry),
             ),
           ],
         ),
       );
     }
     if (state.books.isEmpty) {
-      return const Center(child: Text('Ничего не найдено'));
+      return Center(child: Text(l10n.catalogEmptyResults));
     }
 
     final favoriteBookIds = ref.watch(favoritesControllerProvider).valueOrNull ?? const {};
@@ -206,6 +212,7 @@ class _ActiveFilterTags extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final genresAsync = ref.watch(genresProvider);
     final genreNames = genresAsync.maybeWhen(
       data: (genres) => {for (final g in genres) g.id: g.name},
@@ -218,14 +225,14 @@ class _ActiveFilterTags extends ConsumerWidget {
     final chips = <Widget>[
       for (final genreId in filters.genreIds)
         InputChip(
-          label: Text(genreNames[genreId] ?? 'Жанр'),
+          label: Text(genreNames[genreId] ?? l10n.filterGenreFallback),
           onDeleted: () => update(
             filters.copyWith(genreIds: {...filters.genreIds}..remove(genreId)),
           ),
         ),
       if (filters.language != null)
         InputChip(
-          label: Text(filters.language!),
+          label: Text(languageDisplayName(filters.language!, l10n)),
           onDeleted: () => update(filters.copyWith(language: () => null)),
         ),
       if (filters.priceMin != null || filters.priceMax != null)
@@ -240,7 +247,7 @@ class _ActiveFilterTags extends ConsumerWidget {
         ),
       if (filters.ratingMin != null)
         InputChip(
-          label: Text('от ${filters.ratingMin}★'),
+          label: Text(l10n.filterRatingFrom(filters.ratingMin!)),
           onDeleted: () => update(filters.copyWith(ratingMin: () => null)),
         ),
     ];

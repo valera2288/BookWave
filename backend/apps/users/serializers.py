@@ -45,9 +45,18 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["email", "name", "password", "accept_terms"]
+        # Уникальность проверяет validate_email (без учёта регистра).
+        extra_kwargs = {"email": {"validators": []}}
 
     def validate_name(self, value):
         return validate_user_name(value)
+
+    def validate_email(self, value):
+        # Встроенный UniqueValidator сравнивает e-mail с учётом регистра.
+        value = User.objects.normalize_email(value)
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Пользователь с таким e-mail уже существует.")
+        return value
 
     def validate_password(self, value):
         validate_password(value)
@@ -91,7 +100,7 @@ class EmailChangeRequestSerializer(serializers.Serializer):
         value = User.objects.normalize_email(value)
         if value == user.email:
             raise serializers.ValidationError("Это уже ваш текущий e-mail.")
-        if User.objects.filter(email=value).exists():
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("Этот e-mail уже используется.")
         return value
 
@@ -177,7 +186,7 @@ class EmailConfirmationSerializer(serializers.Serializer):
             )
         if confirmation.new_email and (
             User.objects.exclude(pk=confirmation.user_id)
-            .filter(email=confirmation.new_email)
+            .filter(email__iexact=confirmation.new_email)
             .exists()
         ):
             # Токен живёт до 3 дней — за это время адрес мог занять кто-то

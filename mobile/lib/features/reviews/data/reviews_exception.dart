@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/current_locale.dart';
+import '../../../l10n/app_localizations.dart';
+
 class ReviewsException implements Exception {
   ReviewsException(this.message);
 
@@ -10,7 +13,7 @@ class ReviewsException implements Exception {
     if (data is Map && data['detail'] is String) {
       return ReviewsException(data['detail'] as String);
     }
-    return ReviewsException('Не удалось обновить отзыв. Проверьте соединение.');
+    return ReviewsException(lookupAppLocalizations(currentAppLocale).exceptionReviewsGeneric);
   }
 
   @override

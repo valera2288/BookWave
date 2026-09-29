@@ -1,34 +1,35 @@
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/app_localizations.dart';
+
 class _OnboardingSlide {
   const _OnboardingSlide({required this.icon, required this.title, required this.description});
 
   final IconData icon;
-  final String title;
-  final String description;
+  final String Function(AppLocalizations) title;
+  final String Function(AppLocalizations) description;
 }
 
-const _slides = [
+final _slides = [
   _OnboardingSlide(
     icon: Icons.menu_book_outlined,
-    title: 'Тысячи книг под рукой',
-    description: 'Большой каталог электронных книг всех жанров — от новинок до классики.',
+    title: (l10n) => l10n.onboardingSlide1Title,
+    description: (l10n) => l10n.onboardingSlide1Description,
   ),
   _OnboardingSlide(
     icon: Icons.auto_stories_outlined,
-    title: 'Удобная читалка',
-    description:
-        'Настройте шрифт и тему под себя, добавляйте закладки и ищите нужный отрывок по тексту.',
+    title: (l10n) => l10n.onboardingSlide2Title,
+    description: (l10n) => l10n.onboardingSlide2Description,
   ),
   _OnboardingSlide(
     icon: Icons.bookmark_added_outlined,
-    title: 'Читайте бесплатный фрагмент',
-    description: 'Перед покупкой можно бесплатно прочитать начало любой книги из каталога.',
+    title: (l10n) => l10n.onboardingSlide3Title,
+    description: (l10n) => l10n.onboardingSlide3Description,
   ),
   _OnboardingSlide(
     icon: Icons.collections_bookmark_outlined,
-    title: 'Прогресс всегда с вами',
-    description: 'Библиотека купленных книг и прогресс чтения сохраняются на вашем аккаунте.',
+    title: (l10n) => l10n.onboardingSlide4Title,
+    description: (l10n) => l10n.onboardingSlide4Description,
   ),
 ];
 
@@ -67,6 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -75,7 +77,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               alignment: Alignment.topRight,
               child: TextButton(
                 onPressed: _isLast ? null : widget.onFinish,
-                child: const Text('Пропустить'),
+                child: Text(l10n.onboardingSkip),
               ),
             ),
             Expanded(
@@ -93,7 +95,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Icon(slide.icon, size: 96, color: theme.colorScheme.primary),
                         const SizedBox(height: 32),
                         Text(
-                          slide.title,
+                          slide.title(l10n),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w600,
@@ -101,7 +103,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          slide.description,
+                          slide.description(l10n),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -136,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _next,
-                  child: Text(_isLast ? 'Начать' : 'Далее'),
+                  child: Text(_isLast ? l10n.onboardingStart : l10n.onboardingNext),
                 ),
               ),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/amount_row.dart';
 import '../../../orders/presentation/screens/checkout_screen.dart';
 import '../../../promo/presentation/promo_controller.dart';
@@ -32,9 +33,10 @@ class CartScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartAsync = ref.watch(cartControllerProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Корзина')),
+      appBar: AppBar(title: Text(l10n.navCart)),
       body: cartAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
@@ -45,13 +47,13 @@ class CartScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               FilledButton(
                 onPressed: () => ref.invalidate(cartControllerProvider),
-                child: const Text('Повторить'),
+                child: Text(l10n.commonRetry),
               ),
             ],
           ),
         ),
         data: (cart) => cart.items.isEmpty
-            ? const Center(child: Text('Корзина пуста'))
+            ? Center(child: Text(l10n.cartEmpty))
             : _CartBody(
                 cart: cart,
                 onRemove: (bookId) => _removeItem(context, ref, bookId),
@@ -139,7 +141,7 @@ class _CartItemTile extends StatelessWidget {
         ),
         IconButton(
           icon: const Icon(Icons.delete_outline),
-          tooltip: 'Удалить из корзины',
+          tooltip: AppLocalizations.of(context)!.cartRemoveItemTooltip,
           onPressed: onRemove,
         ),
       ],
@@ -183,6 +185,7 @@ class _CartSummaryState extends ConsumerState<_CartSummary> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final promoState = ref.watch(promoControllerProvider);
     final preview = promoState.preview;
     // Скидка считалась от суммы корзины на момент применения промокода —
@@ -210,9 +213,9 @@ class _CartSummaryState extends ConsumerState<_CartSummary> {
                   child: TextField(
                     controller: _promoController,
                     textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
-                      hintText: 'Промокод',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: l10n.cartPromoHint,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
@@ -226,7 +229,7 @@ class _CartSummaryState extends ConsumerState<_CartSummary> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Применить'),
+                      : Text(l10n.filtersApply),
                 ),
               ],
             ),
@@ -238,13 +241,13 @@ class _CartSummaryState extends ConsumerState<_CartSummary> {
               ),
             ],
             const SizedBox(height: 12),
-            AmountRow(label: 'Сумма товаров', value: subtotal),
-            if (discount > 0) AmountRow(label: 'Скидка по промокоду', value: -discount),
+            AmountRow(label: l10n.cartSubtotal, value: subtotal),
+            if (discount > 0) AmountRow(label: l10n.cartPromoDiscount, value: -discount),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Итого', style: theme.textTheme.titleMedium),
+                Text(l10n.cartTotal, style: theme.textTheme.titleMedium),
                 Text(
                   '${total.toStringAsFixed(0)} ₽',
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -252,7 +255,7 @@ class _CartSummaryState extends ConsumerState<_CartSummary> {
               ],
             ),
             const SizedBox(height: 12),
-            FilledButton(onPressed: widget.onCheckoutTap, child: const Text('Оформить заказ')),
+            FilledButton(onPressed: widget.onCheckoutTap, child: Text(l10n.cartCheckoutButton)),
           ],
         ),
       ),

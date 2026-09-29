@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../book_details/presentation/book_detail_providers.dart';
 import '../../../library/presentation/library_providers.dart';
 import '../../../orders/presentation/order_date_format.dart';
@@ -21,13 +22,14 @@ class ReviewsSection extends ConsumerWidget {
     final isOwned = (ref.watch(libraryProvider).valueOrNull ?? const [])
         .any((entry) => entry.book.id == bookId);
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return reviewsAsync.when(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (error, _) => Text('Не удалось загрузить отзывы: $error'),
+      error: (error, _) => Text(l10n.reviewsLoadError(error.toString())),
       data: (state) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -35,7 +37,7 @@ class ReviewsSection extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                'Отзывов пока нет.',
+                l10n.reviewsEmpty,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -56,7 +58,7 @@ class ReviewsSection extends ConsumerWidget {
                     )
                   : TextButton(
                       onPressed: () => ref.read(reviewsProvider(bookId).notifier).loadMore(),
-                      child: const Text('Показать ещё'),
+                      child: Text(l10n.reviewsShowMore),
                     ),
             ),
           const SizedBox(height: 16),
@@ -69,7 +71,7 @@ class ReviewsSection extends ConsumerWidget {
             )
           else
             Text(
-              'Оставить отзыв можно после покупки книги.',
+              l10n.reviewsPurchaseRequired,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -110,7 +112,10 @@ class _ReviewTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(formatOrderDate(review.createdAt), style: theme.textTheme.bodySmall),
+              Text(
+                formatOrderDate(review.createdAt, Localizations.localeOf(context).languageCode),
+                style: theme.textTheme.bodySmall,
+              ),
             ],
           ),
           if (review.text.isNotEmpty) ...[
@@ -200,16 +205,17 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
   );
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите оценку от 1 до 5 звёзд')),
+        SnackBar(content: Text(l10n.reviewSelectRating)),
       );
       return;
     }
     final text = _textController.text.trim();
     if (text.isNotEmpty && text.length < _minTextLength) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Текст отзыва должен быть не короче $_minTextLength символов')),
+        SnackBar(content: Text(l10n.reviewTextTooShort(_minTextLength))),
       );
       return;
     }
@@ -220,7 +226,7 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
       // клиент перечитать карточку, чтобы увидеть свежее значение.
       ref.invalidate(bookDetailProvider(widget.bookId));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Отзыв сохранён')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.reviewSaved)));
       }
     } catch (e) {
       if (mounted) {
@@ -230,19 +236,20 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
   }
 
   Future<void> _delete() async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить отзыв?'),
-        content: const Text('Отзыв будет удалён без возможности восстановления.'),
+        title: Text(l10n.reviewDeleteTitle),
+        content: Text(l10n.reviewDeleteMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Удалить'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -267,11 +274,12 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          widget.existing == null ? 'Оставить отзыв' : 'Ваш отзыв',
+          widget.existing == null ? l10n.reviewLeaveTitle : l10n.reviewYourTitle,
           style: theme.textTheme.titleSmall,
         ),
         const SizedBox(height: 4),
@@ -294,9 +302,9 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
           enabled: !widget.isSubmitting,
           maxLines: 3,
           maxLength: _maxTextLength,
-          decoration: const InputDecoration(
-            hintText: 'Расскажите о впечатлениях от книги (необязательно, от 10 символов)',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: l10n.reviewTextHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 8),
@@ -305,14 +313,14 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
             Expanded(
               child: FilledButton(
                 onPressed: widget.isSubmitting ? null : _submit,
-                child: Text(widget.existing == null ? 'Отправить' : 'Сохранить'),
+                child: Text(widget.existing == null ? l10n.authSend : l10n.reviewSave),
               ),
             ),
             if (widget.existing != null) ...[
               const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: widget.isSubmitting ? null : _delete,
-                child: const Text('Удалить'),
+                child: Text(l10n.commonDelete),
               ),
             ],
           ],

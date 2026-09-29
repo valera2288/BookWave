@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/data/auth_exception.dart';
 
 /// Смена пароля (ТЗ, «настройки профиля»): текущий пароль + новый ×2.
@@ -41,7 +42,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             newPassword2: _newConfirmController.text,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Пароль изменён')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.changePasswordSuccess)),
+      );
       Navigator.of(context).pop();
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -53,8 +56,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Смена пароля')),
+      appBar: AppBar(title: Text(l10n.changePasswordTitle)),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -69,9 +73,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     TextFormField(
                       controller: _currentController,
                       obscureText: _obscure,
-                      decoration: const InputDecoration(labelText: 'Текущий пароль'),
+                      decoration: InputDecoration(labelText: l10n.changePasswordCurrent),
                       validator: (value) =>
-                          (value == null || value.isEmpty) ? 'Введите текущий пароль' : null,
+                          (value == null || value.isEmpty) ? l10n.changePasswordCurrentRequired : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -79,7 +83,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                       obscureText: _obscure,
                       autofillHints: const [AutofillHints.newPassword],
                       decoration: InputDecoration(
-                        labelText: 'Новый пароль',
+                        labelText: l10n.authNewPassword,
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -88,9 +92,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.length < 8) return 'Минимум 8 символов';
+                        if (value == null || value.length < 8) return l10n.authPasswordMinLength;
                         if (!value.contains(RegExp(r'[0-9]'))) {
-                          return 'Пароль должен содержать минимум одну цифру';
+                          return l10n.authPasswordNeedsDigit;
                         }
                         return null;
                       },
@@ -99,9 +103,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     TextFormField(
                       controller: _newConfirmController,
                       obscureText: _obscure,
-                      decoration: const InputDecoration(labelText: 'Повторите новый пароль'),
+                      decoration: InputDecoration(labelText: l10n.changePasswordRepeatNew),
                       validator: (value) =>
-                          value != _newController.text ? 'Пароли не совпадают' : null,
+                          value != _newController.text ? l10n.authPasswordsMismatch : null,
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
@@ -112,7 +116,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Сменить пароль'),
+                          : Text(l10n.changePasswordButton),
                     ),
                   ],
                 ),

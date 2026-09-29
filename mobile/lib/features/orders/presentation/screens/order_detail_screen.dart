@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/order.dart';
 import '../order_date_format.dart';
 import '../orders_providers.dart';
@@ -17,20 +18,21 @@ class OrderDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orderAsync = ref.watch(orderDetailProvider(orderId));
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Заказ #$orderId')),
+      appBar: AppBar(title: Text(l10n.orderDetailTitle(orderId))),
       body: orderAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Не удалось загрузить заказ'),
+              Text(l10n.orderDetailLoadError),
               const SizedBox(height: 8),
               FilledButton(
                 onPressed: () => ref.invalidate(orderDetailProvider(orderId)),
-                child: const Text('Повторить'),
+                child: Text(l10n.commonRetry),
               ),
             ],
           ),
@@ -49,17 +51,18 @@ class _OrderDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(order.status.label, style: theme.textTheme.titleMedium),
+        Text(order.status.label(l10n), style: theme.textTheme.titleMedium),
         Text(
-          formatOrderDate(order.createdAt),
+          formatOrderDate(order.createdAt, Localizations.localeOf(context).languageCode),
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         Text(
-          '${order.items.length} книг(и)',
+          l10n.orderItemCount(order.items.length),
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         const Divider(height: 32),
@@ -77,7 +80,7 @@ class _OrderDetailBody extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Итого', style: theme.textTheme.titleMedium),
+            Text(l10n.cartTotal, style: theme.textTheme.titleMedium),
             Text(
               '${order.totalAmount.toStringAsFixed(0)} ₽',
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),

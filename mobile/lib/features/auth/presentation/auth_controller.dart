@@ -3,6 +3,16 @@ import 'dart:io' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../cart/presentation/cart_controller.dart';
+import '../../favorites/presentation/favorites_controller.dart';
+import '../../home/presentation/home_providers.dart';
+import '../../home/presentation/main_shell.dart';
+import '../../library/presentation/library_providers.dart';
+import '../../orders/presentation/orders_providers.dart';
+import '../../reader/presentation/reader_providers.dart';
+import '../../reader/presentation/reader_settings_controller.dart';
+import '../../reviews/presentation/reviews_controller.dart';
+import '../data/auth_exception.dart';
 import '../domain/app_user.dart';
 
 /// `null` в данных — гость (не аутентифицирован). `AsyncLoading` во время
@@ -16,11 +26,16 @@ class AuthController extends AsyncNotifier<AppUser?> {
       final user = await repository.restoreSession();
       if (user != null) _registerDeviceToken();
       return user;
-    } catch (_) {
-      // Битый/просроченный refresh-токен — считаем сессию отсутствующей,
-      // а не фатальной ошибкой экрана.
-      await repository.logout();
-      return null;
+    } on AuthException catch (e) {
+      // 401 — токены действительно недействительны (refresh не помог):
+      // сессии нет. Любая другая ошибка (нет сети, сервер недоступен) —
+      // токены сохраняем, иначе ТЗ-шный автовход терялся бы от одного
+      // запуска без интернета; _AuthGate покажет экран «Повторить».
+      if (e.statusCode == 401) {
+        await repository.logout();
+        return null;
+      }
+      rethrow;
     }
   }
 
@@ -62,6 +77,30 @@ class AuthController extends AsyncNotifier<AppUser?> {
     await _unregisterDeviceToken();
     await repository.logout();
     state = const AsyncData(null);
+    _clearUserScopedCaches();
+  }
+
+  /// На том же устройстве может войти другой аккаунт — без явной очистки
+  /// эти провайдеры (кроме `authControllerProvider`, уже сброшен выше)
+  /// кешируются на уровне приложения, а не сессии, и next-пользователь
+  /// увидел бы чужую библиотеку/корзину/заказы/закладки до первого
+  /// естественного invalidate (см. ТЗ: доступ к чужой библиотеке и
+  /// заказам запрещён независимо от корректности запроса — это касается
+  /// и клиентского кеша, не только серверных проверок).
+  void _clearUserScopedCaches() {
+    ref.invalidate(cartControllerProvider);
+    ref.invalidate(favoritesControllerProvider);
+    ref.invalidate(libraryProvider);
+    ref.invalidate(orderHistoryProvider);
+    ref.invalidate(orderDetailProvider);
+    ref.invalidate(recommendationsProvider);
+    ref.invalidate(reviewsProvider);
+    ref.invalidate(bookmarksProvider);
+    // Не привязана к аккаунту (хранится локально в appPreferencesProvider,
+    // не с сервера) — реального риска утечки между пользователями нет, но
+    // сбрасываем заодно, чтобы provider-состояние логаута было единообразным.
+    ref.invalidate(readerSettingsProvider);
+    ref.read(mainShellTabIndexProvider.notifier).state = 0;
   }
 
   /// Best-effort побочный эффект — сбой регистрации/отвязки токена не

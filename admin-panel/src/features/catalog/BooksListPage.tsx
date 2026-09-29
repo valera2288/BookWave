@@ -5,6 +5,7 @@ import { extractErrorDetail, type Paginated } from "../../shared/apiTypes";
 import Pagination from "../../shared/Pagination";
 import { useDebouncedValue } from "../../shared/useDebouncedValue";
 import { deleteBook, fetchAuthors, fetchBooks, fetchGenres } from "./api";
+import { languageLabel } from "./languageLabel";
 import type { Author, BookAdmin, Genre } from "./types";
 
 export default function BooksListPage() {
@@ -59,10 +60,13 @@ export default function BooksListPage() {
     }
     try {
       await deleteBook(book.id);
-      // Мягкое удаление на сервере (is_active=False) — сама книга в БД
-      // остаётся, но в списке управления каталогом ей больше делать нечего,
-      // поэтому просто убираем строку локально, не перезапрашивая список.
-      setData((prev) => (prev ? { ...prev, results: prev.results.filter((b) => b.id !== book.id) } : prev));
+      // Мягкое удаление на сервере (is_active=False) — книга остаётся в
+      // списке (сервер отдаёт и неактивные), но помечается «Удалена».
+      setData((prev) =>
+        prev
+          ? { ...prev, results: prev.results.map((b) => (b.id === book.id ? { ...b, is_active: false } : b)) }
+          : prev,
+      );
     } catch (err) {
       setError(extractErrorDetail(err, "Не удалось удалить книгу."));
     }
@@ -118,6 +122,7 @@ export default function BooksListPage() {
                   <th>Название</th>
                   <th>Авторы</th>
                   <th>Жанры</th>
+                  <th>Язык</th>
                   <th>Цена</th>
                   <th />
                 </tr>
@@ -130,17 +135,28 @@ export default function BooksListPage() {
                         <img src={book.cover} alt="" style={{ width: 36, borderRadius: 4 }} />
                       )}
                     </td>
-                    <td>{book.title}</td>
+                    <td>
+                      {book.title}
+                      {!book.is_active && (
+                        <>
+                          {" "}
+                          <span className="badge badge-neutral">Удалена</span>
+                        </>
+                      )}
+                    </td>
                     <td>{book.authors.map(authorName).join(", ")}</td>
                     <td>{book.genres.map(genreName).join(", ")}</td>
+                    <td>{languageLabel(book.language)}</td>
                     <td>{book.price} ₽</td>
                     <td className="actions-cell">
                       <Link to={`/catalog/books/${book.id}/edit`}>
                         <button type="button">Редактировать</button>
                       </Link>
-                      <button type="button" className="danger" onClick={() => handleDelete(book)}>
-                        Удалить
-                      </button>
+                      {book.is_active && (
+                        <button type="button" className="danger" onClick={() => handleDelete(book)}>
+                          Удалить
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -8,9 +8,13 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --surface: #1c1d24;
   }
+}
+
+:root[data-theme="dark"] {
+  --surface: #1c1d24;
 }
 
 * {
@@ -132,8 +136,34 @@ textarea {
   color: var(--accent-contrast);
 }
 
-.app-sidebar .logout-btn {
+.theme-switch {
   margin-top: auto;
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.theme-switch button {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 4px;
+  font-size: 0.78rem;
+}
+
+.theme-switch button + button {
+  border-left: 1px solid var(--border);
+}
+
+.theme-switch button.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.app-sidebar .logout-btn {
+  margin-top: 8px;
 }
 
 .app-content {

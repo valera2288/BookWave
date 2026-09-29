@@ -19,6 +19,17 @@ def generate_token() -> str:
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
+    @classmethod
+    def normalize_email(cls, email):
+        # Базовая версия приводит к нижнему регистру только домен — тогда
+        # "User@x.com" и "user@x.com" были бы двумя разными аккаунтами, а
+        # вход/сброс пароля с другим регистром не находили бы пользователя.
+        return super().normalize_email(email).lower()
+
+    def get_by_natural_key(self, username):
+        # Вход (ModelBackend) — без учёта регистра, как и хранение выше.
+        return self.get(**{f"{self.model.USERNAME_FIELD}__iexact": username})
+
     def _create_user(self, email, password, name, **extra_fields):
         if not email:
             raise ValueError("Email обязателен")

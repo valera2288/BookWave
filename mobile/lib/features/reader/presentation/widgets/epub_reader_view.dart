@@ -62,6 +62,17 @@ class _EpubReaderViewState extends State<EpubReaderView> {
   bool _jumpedToInitial = false;
   String? _highlightQuery;
 
+  // Постраничный режим: страница — глава со своим скроллом. Чтобы прогресс,
+  // закладки и возврат к месту чтения работали внутри главы, а не только по
+  // её началу, у каждой главы свой ScrollController, а у каждого блока —
+  // ключ для точного перехода (Scrollable.ensureVisible).
+  final _chapterScrollControllers = <int, ScrollController>{};
+  final _blockKeys = <String, GlobalKey>{};
+  List<int> _chapterStarts = const [];
+  int _totalBlocks = 0;
+  int _currentChapter = 0;
+  String? _pendingPosition;
+
   @override
   void initState() {
     super.initState();
@@ -75,14 +86,95 @@ class _EpubReaderViewState extends State<EpubReaderView> {
     widget.controller._detach(this);
     _scrollController.dispose();
     _pageController.dispose();
+    for (final controller in _chapterScrollControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _load() async {
     final book = await parseEpubFile(widget.file);
     if (!mounted) return;
-    setState(() => _book = book);
+    final starts = <int>[];
+    var total = 0;
+    for (final chapter in book.chapters) {
+      starts.add(total);
+      total += chapter.blocks.length;
+    }
+    setState(() {
+      _book = book;
+      _chapterStarts = starts;
+      _totalBlocks = total;
+    });
     widget.onTocReady(book.toc);
+  }
+
+  ScrollController _chapterController(int chapterIndex) =>
+      _chapterScrollControllers.putIfAbsent(chapterIndex, () {
+        final controller = ScrollController();
+        controller.addListener(() {
+          if (chapterIndex == _currentChapter) _reportPagedPosition(chapterIndex);
+        });
+        return controller;
+      });
+
+  GlobalKey _blockKey(EpubBlock block) => _blockKeys.putIfAbsent(block.position, GlobalKey.new);
+
+  /// Текущий блок главы — по доле прокрутки внутри неё; прогресс — доля
+  /// этого блока среди всех блоков книги.
+  void _reportPagedPosition(int chapterIndex, {bool withProgress = true}) {
+    final book = _book;
+    if (book == null) return;
+    final blocks = book.chapters[chapterIndex].blocks;
+    if (blocks.isEmpty) return;
+    final controller = _chapterScrollControllers[chapterIndex];
+    var fraction = 0.0;
+    if (controller != null && controller.hasClients) {
+      final position = controller.position;
+      fraction = position.maxScrollExtent > 0
+          ? (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0)
+          : 1.0;
+    }
+    final blockIndex = (fraction * (blocks.length - 1)).round();
+    widget.onCurrentPositionChanged(blocks[blockIndex].position);
+    if (!withProgress) return;
+    final globalIndex = _chapterStarts[chapterIndex] + blockIndex;
+    final percent = _totalBlocks > 1 ? (globalIndex / (_totalBlocks - 1) * 100).round() : 100;
+    widget.onProgressChanged(percent);
+  }
+
+  /// Переход к блоку в постраничном режиме: сначала на страницу главы,
+  /// потом — прокрутка к самому блоку, когда страница построена.
+  void _jumpToPagedPosition(String position, int chapterIndex) {
+    _pendingPosition = position;
+    if (_pageController.hasClients && _currentChapter != chapterIndex) {
+      _pageController.jumpToPage(chapterIndex);
+    }
+    _applyPendingPosition(attemptsLeft: 5);
+  }
+
+  void _applyPendingPosition({required int attemptsLeft}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final position = _pendingPosition;
+      if (!mounted || position == null) return;
+      final blockContext = _blockKeys[position]?.currentContext;
+      if (blockContext == null) {
+        if (attemptsLeft > 0) {
+          _applyPendingPosition(attemptsLeft: attemptsLeft - 1);
+        } else {
+          // Не дождались построения страницы — хотя бы остаёмся на главе и
+          // не блокируем дальнейшие обновления позиции в onPageChanged.
+          _pendingPosition = null;
+          _reportPagedPosition(_currentChapter);
+        }
+        return;
+      }
+      _pendingPosition = null;
+      Scrollable.ensureVisible(blockContext);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _reportPagedPosition(_currentChapter);
+      });
+    });
   }
 
   void _setHighlight(String query) => setState(() => _highlightQuery = query.trim());
@@ -101,21 +193,35 @@ class _EpubReaderViewState extends State<EpubReaderView> {
   }
 
   void _jumpToInitialProgress() {
-    if (_jumpedToInitial || widget.initialProgress <= 0) return;
+    if (_jumpedToInitial) return;
     final book = _book;
     if (book == null) return;
     _jumpedToInitial = true;
+    if (widget.initialProgress <= 0) {
+      // Без этого до первой прокрутки позиция пуста и «Закладка здесь»
+      // недоступна на первой странице.
+      if (!widget.settings.continuousScroll) {
+        _reportPagedPosition(_currentChapter, withProgress: false);
+      }
+      return;
+    }
     if (widget.settings.continuousScroll) {
       if (!_scrollController.hasClients) return;
       final maxExtent = _scrollController.position.maxScrollExtent;
       if (maxExtent > 0) {
         _scrollController.jumpTo(maxExtent * widget.initialProgress / 100);
       }
-    } else if (book.chapters.length > 1) {
-      final chapterIndex = ((widget.initialProgress / 100) * (book.chapters.length - 1))
-          .round()
-          .clamp(0, book.chapters.length - 1);
-      if (_pageController.hasClients) _pageController.jumpToPage(chapterIndex);
+    } else if (_totalBlocks > 0) {
+      // Обратно к формуле _reportPagedPosition: процент -> блок книги.
+      final globalIndex =
+          ((widget.initialProgress / 100) * (_totalBlocks - 1)).round().clamp(0, _totalBlocks - 1);
+      var chapterIndex = 0;
+      while (chapterIndex + 1 < _chapterStarts.length &&
+          _chapterStarts[chapterIndex + 1] <= globalIndex) {
+        chapterIndex++;
+      }
+      final block = book.chapters[chapterIndex].blocks[globalIndex - _chapterStarts[chapterIndex]];
+      _jumpToPagedPosition(block.position, chapterIndex);
     }
   }
 
@@ -134,8 +240,15 @@ class _EpubReaderViewState extends State<EpubReaderView> {
       if (effectiveIndex < 0 || blocks.isEmpty) return;
       final fraction = effectiveIndex / blocks.length;
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent * fraction);
-    } else if (_pageController.hasClients) {
-      _pageController.jumpToPage(chapterIndex.clamp(0, book.chapters.length - 1));
+    } else {
+      final clamped = chapterIndex.clamp(0, book.chapters.length - 1);
+      final blocks = book.chapters[clamped].blocks;
+      final exists = blocks.any((b) => b.position == position);
+      if (!exists && blocks.isEmpty) {
+        if (_pageController.hasClients) _pageController.jumpToPage(clamped);
+        return;
+      }
+      _jumpToPagedPosition(exists ? position : blocks.first.position, clamped);
     }
   }
 
@@ -193,22 +306,20 @@ class _EpubReaderViewState extends State<EpubReaderView> {
         controller: _pageController,
         itemCount: book.chapters.length,
         onPageChanged: (index) {
-          final percent = book.chapters.length > 1
-              ? (index / (book.chapters.length - 1) * 100).round()
-              : 100;
-          widget.onProgressChanged(percent);
-          final chapterBlocks = book.chapters[index].blocks;
-          if (chapterBlocks.isNotEmpty) {
-            widget.onCurrentPositionChanged(chapterBlocks.first.position);
-          }
+          _currentChapter = index;
+          // Во время программного перехода позицию сообщит
+          // _applyPendingPosition уже после прокрутки к нужному блоку.
+          if (_pendingPosition == null) _reportPagedPosition(index);
         },
         itemBuilder: (context, index) => SingleChildScrollView(
+          controller: _chapterController(index),
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (final block in book.chapters[index].blocks)
                 _BlockText(
+                  key: _blockKey(block),
                   block: block,
                   settings: widget.settings,
                   color: _textColor,
@@ -228,6 +339,7 @@ class _BlockText extends StatelessWidget {
     required this.settings,
     required this.color,
     required this.highlightQuery,
+    super.key,
   });
 
   final EpubBlock block;

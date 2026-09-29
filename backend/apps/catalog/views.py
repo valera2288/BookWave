@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -32,7 +32,10 @@ SORT_OPTIONS = {
     "default": "-created_at",
     "cheap_first": "price",
     "expensive_first": "-price",
-    "rating": "-average_rating",
+    # Postgres по умолчанию ставит NULL первым при ORDER BY ... DESC —
+    # книги без отзывов (average_rating is NULL) оказывались бы выше
+    # реально оценённых, что для сортировки "по рейтингу" неверно.
+    "rating": F("average_rating").desc(nulls_last=True),
     "newest": "-created_at",
 }
 

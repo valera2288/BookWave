@@ -17,7 +17,12 @@ from apps.library.models import LibraryEntry
 from apps.users.models import User
 from config.urls import PUBLIC_MEDIA_PATTERN
 
-from .services import build_epub_excerpt, build_fb2_excerpt, build_pdf_excerpt
+from .services import (
+    build_epub_excerpt,
+    build_fb2_excerpt,
+    build_pdf_excerpt,
+    select_excerpt_count,
+)
 from .views import BookFileView
 
 
@@ -83,7 +88,7 @@ class BuildEpubExcerptTests(TestCase):
     def test_truncates_spine_to_ratio_and_stays_valid(self):
         with tempfile.TemporaryDirectory() as tmp:
             src = _make_epub(tmp, ["x" * 1000 for _ in range(4)])
-            excerpt = build_epub_excerpt(src, ratio=0.12)
+            excerpt = build_epub_excerpt(src)
 
             with zipfile.ZipFile(io.BytesIO(excerpt)) as z:
                 names = z.namelist()
@@ -101,10 +106,24 @@ class BuildEpubExcerptTests(TestCase):
     def test_never_produces_empty_spine(self):
         with tempfile.TemporaryDirectory() as tmp:
             src = _make_epub(tmp, ["short text"])
-            excerpt = build_epub_excerpt(src, ratio=0.01)
+            excerpt = build_epub_excerpt(src)
 
             with zipfile.ZipFile(io.BytesIO(excerpt)) as z:
                 self.assertIn("OEBPS/ch0.xhtml", z.namelist())
+
+
+class SelectExcerptCountTests(TestCase):
+    """Фрагмент — 10–15% текста (ТЗ); режется целыми частями, при
+    перескоке за 15% берётся вариант ближе к диапазону."""
+
+    def test_stops_once_min_ratio_reached(self):
+        self.assertEqual(select_excerpt_count([5, 5, 50, 40]), 2)  # 10%
+
+    def test_excludes_part_when_undershoot_is_closer(self):
+        self.assertEqual(select_excerpt_count([8, 10, 82]), 1)  # 8% ближе, чем 18%
+
+    def test_includes_part_when_overshoot_is_closer(self):
+        self.assertEqual(select_excerpt_count([4, 12, 84]), 2)  # 16% ближе, чем 4%
 
 
 class BuildPdfExcerptTests(TestCase):
@@ -129,7 +148,7 @@ class BuildFb2ExcerptTests(TestCase):
     def test_truncates_sections_and_keeps_description(self):
         with tempfile.TemporaryDirectory() as tmp:
             src = _make_fb2(tmp, ["x" * 1000 for _ in range(4)])
-            excerpt = build_fb2_excerpt(src, ratio=0.12)
+            excerpt = build_fb2_excerpt(src)
 
             root = ET.fromstring(excerpt)
             ns = {"fb": "http://www.gribuser.ru/xml/fictionbook/2.0"}

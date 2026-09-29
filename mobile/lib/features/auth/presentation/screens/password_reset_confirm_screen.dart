@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/auth_exception.dart';
 
 /// Токен обычно приходит уже подставленным — пользователь открыл письмо
@@ -49,7 +50,7 @@ class _PasswordResetConfirmScreenState
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Пароль изменён. Теперь можно войти.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.authPasswordChangedMessage)),
       );
       Navigator.of(context).popUntil((route) => route.isFirst);
     } on AuthException catch (e) {
@@ -62,8 +63,9 @@ class _PasswordResetConfirmScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Новый пароль')),
+      appBar: AppBar(title: Text(l10n.authNewPassword)),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -78,11 +80,11 @@ class _PasswordResetConfirmScreenState
                     if (!_hasTokenFromLink) ...[
                       TextFormField(
                         controller: _tokenController,
-                        decoration: const InputDecoration(
-                          labelText: 'Токен из письма',
+                        decoration: InputDecoration(
+                          labelText: l10n.authTokenLabel,
                         ),
                         validator: (value) =>
-                            (value == null || value.trim().isEmpty) ? 'Введите токен' : null,
+                            (value == null || value.trim().isEmpty) ? l10n.authTokenRequired : null,
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -91,7 +93,7 @@ class _PasswordResetConfirmScreenState
                       obscureText: _obscurePassword,
                       autofillHints: const [AutofillHints.newPassword],
                       decoration: InputDecoration(
-                        labelText: 'Новый пароль',
+                        labelText: l10n.authNewPassword,
                         suffixIcon: IconButton(
                           icon: Icon(_obscurePassword
                               ? Icons.visibility_outlined
@@ -101,9 +103,9 @@ class _PasswordResetConfirmScreenState
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.length < 8) return 'Минимум 8 символов';
+                        if (value == null || value.length < 8) return l10n.authPasswordMinLength;
                         if (!value.contains(RegExp(r'[0-9]'))) {
-                          return 'Пароль должен содержать минимум одну цифру';
+                          return l10n.authPasswordNeedsDigit;
                         }
                         return null;
                       },
@@ -112,9 +114,9 @@ class _PasswordResetConfirmScreenState
                     TextFormField(
                       controller: _passwordConfirmController,
                       obscureText: _obscurePassword,
-                      decoration: const InputDecoration(labelText: 'Повторите пароль'),
+                      decoration: InputDecoration(labelText: l10n.authRepeatPasswordLabel),
                       validator: (value) => value != _passwordController.text
-                          ? 'Пароли не совпадают'
+                          ? l10n.authPasswordsMismatch
                           : null,
                     ),
                     const SizedBox(height: 24),
@@ -126,7 +128,7 @@ class _PasswordResetConfirmScreenState
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Сохранить пароль'),
+                          : Text(l10n.authSavePassword),
                     ),
                   ],
                 ),

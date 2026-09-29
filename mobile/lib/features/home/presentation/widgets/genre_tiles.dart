@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../catalog/domain/genre.dart';
 
 /// Блок «Жанры» в виде плиток с переходом в отфильтрованный каталог (ТЗ).
@@ -18,7 +19,7 @@ class GenreTiles extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Жанры', style: theme.textTheme.titleMedium),
+          child: Text(AppLocalizations.of(context)!.homeSectionGenres, style: theme.textTheme.titleMedium),
         ),
         const SizedBox(height: 8),
         Padding(

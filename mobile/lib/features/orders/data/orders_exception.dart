@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/current_locale.dart';
+import '../../../l10n/app_localizations.dart';
+
 class OrdersException implements Exception {
   OrdersException(this.message);
 
@@ -10,7 +13,7 @@ class OrdersException implements Exception {
     if (data is Map && data['detail'] is String) {
       return OrdersException(data['detail'] as String);
     }
-    return OrdersException('Не удалось оформить заказ. Проверьте соединение.');
+    return OrdersException(lookupAppLocalizations(currentAppLocale).exceptionOrdersGeneric);
   }
 
   @override

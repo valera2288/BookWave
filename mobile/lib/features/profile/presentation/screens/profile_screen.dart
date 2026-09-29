@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/domain/app_user.dart';
 import '../../../auth/presentation/auth_controller.dart';
 import '../../../favorites/presentation/screens/favorites_screen.dart';
@@ -17,19 +18,20 @@ class ProfileScreen extends ConsumerWidget {
   final AppUser user;
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Выйти из аккаунта?'),
-        content: const Text('Понадобится снова ввести e-mail и пароль для входа.'),
+        title: Text(l10n.profileLogoutTitle),
+        content: Text(l10n.profileLogoutMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
+            child: Text(l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Выйти'),
+            child: Text(l10n.profileLogout),
           ),
         ],
       ),
@@ -41,8 +43,9 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Профиль')),
+      appBar: AppBar(title: Text(l10n.profileTitle)),
       body: ListView(
         children: [
           const SizedBox(height: 24),
@@ -63,7 +66,7 @@ class ProfileScreen extends ConsumerWidget {
                 Text(user.name, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
-                  'Изменить профиль',
+                  l10n.profileEdit,
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -76,7 +79,7 @@ class ProfileScreen extends ConsumerWidget {
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.receipt_long_outlined),
-            title: const Text('Мои заказы'),
+            title: Text(l10n.ordersTitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
@@ -84,7 +87,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.favorite_border),
-            title: const Text('Избранное'),
+            title: Text(l10n.favoritesTitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const FavoritesScreen()),
@@ -92,7 +95,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.settings_outlined),
-            title: const Text('Настройки'),
+            title: Text(l10n.profileSettings),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -101,7 +104,7 @@ class ProfileScreen extends ConsumerWidget {
           const Divider(height: 1),
           ListTile(
             leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
-            title: Text('Выйти', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            title: Text(l10n.profileLogout, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             onTap: () => _confirmLogout(context, ref),
           ),
         ],

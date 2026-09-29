@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/amount_row.dart';
 import '../../../cart/domain/cart.dart';
 import '../../../cart/presentation/cart_controller.dart';
+import '../../../home/presentation/home_providers.dart';
+import '../../../library/presentation/library_providers.dart';
 import '../../../promo/domain/promo_preview.dart';
 import '../../../promo/presentation/promo_controller.dart';
 import '../../data/orders_exception.dart';
+import '../orders_providers.dart';
 import 'order_success_screen.dart';
 
 /// Экран «Оформление заказа» из ТЗ: список книг и сумма, блок оплаты
@@ -44,6 +48,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             promoCode: _promoApplies ? widget.promo!.code : null,
           );
       ref.invalidate(cartControllerProvider);
+      // Заказ пополняет и библиотеку, и историю заказов — обе кешируются
+      // в глобальных FutureProvider'ах, без явной инвалидации экраны
+      // показывали бы старые данные до ручного pull-to-refresh.
+      ref.invalidate(libraryProvider);
+      ref.invalidate(orderHistoryProvider);
+      // ТЗ: «Рекомендуем» не должен предлагать книги, уже купленные
+      // пользователем — без инвалидации купленная книга оставалась бы в
+      // подборке до следующего холодного старта.
+      ref.invalidate(recommendationsProvider);
       ref.read(promoControllerProvider.notifier).clear();
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -61,14 +74,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Оформление заказа')),
+      appBar: AppBar(title: Text(l10n.checkoutTitle)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Ваш заказ', style: theme.textTheme.titleMedium),
+            Text(l10n.checkoutYourOrder, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             for (final item in widget.cart.items)
               Padding(
@@ -81,14 +95,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 ),
               ),
             const Divider(height: 32),
-            AmountRow(label: 'Сумма товаров', value: widget.cart.total),
+            AmountRow(label: l10n.cartSubtotal, value: widget.cart.total),
             if (_promoApplies)
-              AmountRow(label: 'Скидка по промокоду', value: -widget.promo!.discount),
+              AmountRow(label: l10n.cartPromoDiscount, value: -widget.promo!.discount),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Итого к оплате', style: theme.textTheme.titleMedium),
+                Text(l10n.checkoutTotalToPay, style: theme.textTheme.titleMedium),
                 Text(
                   '${_total.toStringAsFixed(0)} ₽',
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -96,11 +110,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Text('Оплата', style: theme.textTheme.titleMedium),
+            Text(l10n.checkoutPayment, style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'Тестовые данные, реальная оплата не выполняется. Номер карты '
-              '4000 0000 0000 0002 имитирует отказ, любой другой — успех.',
+              l10n.checkoutPaymentHint,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -109,9 +122,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             TextField(
               controller: _cardController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Номер карты',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.checkoutCardNumber,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 24),
@@ -123,7 +136,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Оплатить'),
+                  : Text(l10n.checkoutPayButton),
             ),
           ],
         ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../home/presentation/home_providers.dart';
 import '../../../reader/presentation/screens/reader_screen.dart';
 import '../../domain/library_entry.dart';
 import '../library_providers.dart';
@@ -12,22 +14,20 @@ class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref, LibraryEntry entry) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить книгу из библиотеки?'),
-        content: Text(
-          '«${entry.book.title}» будет удалена из «Моей библиотеки» вместе с '
-          'прогрессом чтения. Это действие нельзя отменить.',
-        ),
+        title: Text(l10n.libraryRemoveTitle),
+        content: Text(l10n.libraryRemoveMessage(entry.book.title)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
+            child: Text(l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Удалить'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -37,10 +37,14 @@ class LibraryScreen extends ConsumerWidget {
     try {
       await ref.read(libraryApiProvider).removeFromLibrary(entry.book.id);
       ref.invalidate(libraryProvider);
+      // Зеркально к чекауту (checkout_screen.dart): удалённая книга по ТЗ
+      // снова может появиться в «Рекомендуем» («отсутствующие в его
+      // библиотеке») — без инвалидации подборка осталась бы прежней.
+      ref.invalidate(recommendationsProvider);
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось удалить книгу из библиотеки')),
+          SnackBar(content: Text(l10n.libraryRemoveError)),
         );
       }
     }
@@ -49,26 +53,27 @@ class LibraryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryAsync = ref.watch(libraryProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Моя библиотека')),
+      appBar: AppBar(title: Text(l10n.navLibrary)),
       body: libraryAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Не удалось загрузить библиотеку'),
+              Text(l10n.libraryLoadError),
               const SizedBox(height: 8),
               FilledButton(
                 onPressed: () => ref.invalidate(libraryProvider),
-                child: const Text('Повторить'),
+                child: Text(l10n.commonRetry),
               ),
             ],
           ),
         ),
         data: (entries) => entries.isEmpty
-            ? const Center(child: Text('Пока нет купленных книг'))
+            ? Center(child: Text(l10n.libraryEmpty))
             : RefreshIndicator(
                 onRefresh: () async => ref.invalidate(libraryProvider),
                 child: GridView.builder(
@@ -228,7 +233,7 @@ class _RemoveButton extends StatelessWidget {
       shape: const CircleBorder(),
       child: IconButton(
         icon: const Icon(Icons.delete_outline, color: Colors.white, size: 18),
-        tooltip: 'Удалить из библиотеки',
+        tooltip: AppLocalizations.of(context)!.libraryRemoveTooltip,
         constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
         padding: EdgeInsets.zero,
         onPressed: onPressed,
@@ -245,11 +250,11 @@ class _NewBadge extends StatelessWidget {
     return Material(
       color: Theme.of(context).colorScheme.primary,
       borderRadius: BorderRadius.circular(6),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          'Новая',
-          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+          AppLocalizations.of(context)!.libraryNewBadge,
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
         ),
       ),
     );

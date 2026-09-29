@@ -3,16 +3,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../data/auth_exception.dart';
 import '../auth_controller.dart';
 import 'password_reset_request_screen.dart';
 
 /// Экран «Вход / Регистрация» из ТЗ: один экран с переключателем вкладок,
-/// а не два отдельных — вход и регистрация используют общий root-route,
-/// поэтому успешный сабмит с любой вкладки просто даёт `_AuthGate`
-/// подменить этот экран на `HomeScreen` (пуш/поп не нужны).
+/// а не два отдельных. Как root-route `_AuthGate` (гость ещё не выбрал,
+/// входить или нет) успешный сабмит просто даёт `_AuthGate` подменить этот
+/// экран на `MainShell` (пуш/поп не нужны). Как экран, запушенный поверх
+/// гостевого режима (см. `ensureAuthenticated`) — сам закрывается по
+/// успешному входу через `Navigator.pop`, см. `ref.listen` ниже.
 class AuthScreen extends ConsumerStatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({this.onContinueAsGuest, super.key});
+
+  /// Задан только когда экран показан как root (`_AuthGate`, гость ещё не
+  /// выбирал) — тогда «Продолжить как гость» переключает `_AuthGate` в
+  /// гостевой режим. Если экран запушен поверх уже открытого гостевого
+  /// режима, `null`, и кнопка просто закрывает этот экран (`Navigator.pop`).
+  final VoidCallback? onContinueAsGuest;
 
   @override
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
@@ -49,6 +58,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   int _lockoutSecondsRemaining = 0;
 
   bool get _isLoginTab => _tabController.index == 0;
+
+  void _continueAsGuest() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      widget.onContinueAsGuest?.call();
+    }
+  }
 
   @override
   void initState() {
@@ -103,7 +120,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     } else {
       if (!_registerFormKey.currentState!.validate()) return;
       if (!_acceptTerms) {
-        setState(() => _lastErrorMessage = 'Необходимо принять пользовательское соглашение.');
+        setState(
+          () => _lastErrorMessage = AppLocalizations.of(context)!.authAcceptTermsRequired,
+        );
         return;
       }
       await ref.read(authControllerProvider.notifier).register(
@@ -117,12 +136,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     ref.listen(authControllerProvider, (previous, next) {
+      // Успешный вход из гостевого режима: этот экран был запушен поверх
+      // (см. ensureAuthenticated) — сам себя закрывает, открывая уже
+      // обновлённый `MainShell` под собой. Как root-route `_AuthGate` не
+      // даёт этому экрану ничего попнуть, так что здесь no-op.
+      if (previous?.isLoading == true && next.hasValue && next.value != null) {
+        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+        return;
+      }
       // Реагируем только на переход loading → error, вызванный именно
       // этим сабмитом, а не на любое изменение состояния провайдера.
       if (previous?.isLoading != true || !next.hasError) return;
       final error = next.error;
-      final message = error is AuthException ? error.message : 'Не удалось выполнить запрос.';
+      final message = error is AuthException ? error.message : l10n.authGenericError;
       final isLockoutError = error is AuthException && error.retryAfter != null && _isLoginTab;
       if (isLockoutError) {
         _startLockoutCountdown(error.retryAfter!);
@@ -152,7 +180,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         title: const Text('BookWave'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [Tab(text: 'Вход'), Tab(text: 'Регистрация')],
+          tabs: [Tab(text: l10n.authTabLogin), Tab(text: l10n.authTabRegister)],
         ),
       ),
       body: SafeArea(
@@ -198,7 +226,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   if (isLocked) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Слишком много попыток. Повторите через $_lockoutSecondsRemaining с.',
+                      l10n.authLockoutMessage(_lockoutSecondsRemaining),
                       style: TextStyle(color: Theme.of(context).colorScheme.error),
                       textAlign: TextAlign.center,
                     ),
@@ -224,9 +252,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                                   builder: (_) => const PasswordResetRequestScreen(),
                                 ),
                               ),
-                      child: const Text('Забыли пароль?'),
+                      child: Text(l10n.authForgotPassword),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: isDisabled ? null : _continueAsGuest,
+                    child: Text(l10n.authContinueAsGuest),
+                  ),
                 ],
               ),
             ),
@@ -237,11 +270,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   String _submitLabel(bool isLocked) {
-    if (_isLoginTab) return isLocked ? 'Заблокировано ($_lockoutSecondsRemaining с)' : 'Войти';
-    return 'Зарегистрироваться';
+    final l10n = AppLocalizations.of(context)!;
+    if (_isLoginTab) {
+      return isLocked ? l10n.authLockedButton(_lockoutSecondsRemaining) : l10n.authLoginButton;
+    }
+    return l10n.authRegisterButton;
   }
 
   Widget _buildLoginForm() {
+    final l10n = AppLocalizations.of(context)!;
     return Form(
       key: _loginFormKey,
       child: Column(
@@ -253,7 +290,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             autofillHints: const [AutofillHints.email],
             decoration: const InputDecoration(labelText: 'E-mail'),
             validator: (value) =>
-                (value == null || !value.contains('@')) ? 'Введите корректный e-mail' : null,
+                (value == null || !value.contains('@')) ? l10n.authEmailInvalid : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -261,7 +298,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             obscureText: _obscureLoginPassword,
             autofillHints: const [AutofillHints.password],
             decoration: InputDecoration(
-              labelText: 'Пароль',
+              labelText: l10n.authPasswordLabel,
               suffixIcon: IconButton(
                 icon: Icon(_obscureLoginPassword
                     ? Icons.visibility_outlined
@@ -270,7 +307,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     setState(() => _obscureLoginPassword = !_obscureLoginPassword),
               ),
             ),
-            validator: (value) => (value == null || value.isEmpty) ? 'Введите пароль' : null,
+            validator: (value) =>
+                (value == null || value.isEmpty) ? l10n.authPasswordRequired : null,
             onFieldSubmitted: (_) => _submit(),
           ),
         ],
@@ -279,6 +317,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   Widget _buildRegisterForm() {
+    final l10n = AppLocalizations.of(context)!;
     return Form(
       key: _registerFormKey,
       child: Column(
@@ -286,10 +325,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         children: [
           TextFormField(
             controller: _registerNameController,
-            decoration: const InputDecoration(labelText: 'Имя'),
+            decoration: InputDecoration(labelText: l10n.authNameLabel),
             validator: (value) {
               final length = value?.trim().length ?? 0;
-              if (length < 2 || length > 50) return 'Имя должно быть от 2 до 50 символов';
+              if (length < 2 || length > 50) return l10n.authNameLengthError;
               return null;
             },
           ),
@@ -305,7 +344,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               }
             },
             validator: (value) {
-              if (value == null || !value.contains('@')) return 'Введите корректный e-mail';
+              if (value == null || !value.contains('@')) return l10n.authEmailInvalid;
               return _registerEmailServerError;
             },
           ),
@@ -315,7 +354,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             obscureText: _obscureRegisterPassword,
             autofillHints: const [AutofillHints.newPassword],
             decoration: InputDecoration(
-              labelText: 'Пароль',
+              labelText: l10n.authPasswordLabel,
               suffixIcon: IconButton(
                 icon: Icon(_obscureRegisterPassword
                     ? Icons.visibility_outlined
@@ -330,9 +369,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               }
             },
             validator: (value) {
-              if (value == null || value.length < 8) return 'Минимум 8 символов';
+              if (value == null || value.length < 8) return l10n.authPasswordMinLength;
               if (!value.contains(RegExp(r'[0-9]'))) {
-                return 'Пароль должен содержать минимум одну цифру';
+                return l10n.authPasswordNeedsDigit;
               }
               return _registerPasswordServerError;
             },
@@ -342,7 +381,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             controlAffinity: ListTileControlAffinity.leading,
             value: _acceptTerms,
             onChanged: (value) => setState(() => _acceptTerms = value ?? false),
-            title: const Text('Принимаю пользовательское соглашение'),
+            title: Text(l10n.authAcceptTermsLabel),
           ),
         ],
       ),

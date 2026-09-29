@@ -8,10 +8,21 @@ class LibraryApi {
 
   final Dio _dio;
 
+  /// Бэкенд отдаёт библиотеку постранично (по 20) — собираем все страницы,
+  /// иначе книги после 20-й не видны ни в «Моей библиотеке», ни в проверке
+  /// владения на карточке книги.
   Future<LibraryPage> fetchLibrary() async {
     try {
-      final response = await _dio.get('/library/');
-      return LibraryPage.fromJson(response.data as Map<String, dynamic>);
+      final entries = <LibraryEntry>[];
+      var page = 1;
+      while (true) {
+        final response = await _dio.get('/library/', queryParameters: {'page': page});
+        final data = response.data as Map<String, dynamic>;
+        entries.addAll(LibraryPage.fromJson(data).entries);
+        if (data['next'] == null) break;
+        page += 1;
+      }
+      return LibraryPage(entries: entries);
     } on DioException catch (e) {
       throw LibraryException.fromDioError(e);
     }

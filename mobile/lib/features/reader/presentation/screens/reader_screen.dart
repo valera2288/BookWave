@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/epub_book.dart';
 import '../../domain/reader_settings.dart';
 import '../reader_providers.dart';
@@ -39,39 +40,59 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends ConsumerState<ReaderScreen> {
+class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBindingObserver {
   SimpleEpubController? _epubController;
   PdfViewerController? _pdfController;
   List<EpubTocEntry> _toc = [];
   String _lastEpubPosition = '';
   late int _currentProgress = widget.initialProgress;
-  bool _saving = false;
+  late int _savedProgress = widget.initialProgress;
+  bool _leaving = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.format == 'epub') _epubController = SimpleEpubController();
     if (widget.format == 'pdf') _pdfController = PdfViewerController();
   }
 
-  Future<void> _saveProgressAndLeave() async {
-    if (_saving) return;
-    _saving = true;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Свернули/закрыли приложение, не выходя из книги кнопкой «назад», —
+  // это тоже «закрытие книги» (ТЗ), иначе прогресс терялся бы.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) _saveProgress();
+  }
+
+  Future<void> _saveProgress() async {
     // ТЗ: прогресс сохраняется автоматически при каждом закрытии книги.
     // Фрагмент не привязан к библиотеке — сервер такое обновление всё равно
     // отклонит (нет LibraryEntry), поэтому и не пытаемся.
-    if (!widget.isExcerpt && _currentProgress != widget.initialProgress) {
-      try {
-        await ref.read(libraryApiProvider).updateProgress(
-              bookId: widget.bookId,
-              progress: _currentProgress,
-              updatedAt: DateTime.now(),
-            );
-      } catch (_) {
-        // Нет сети — не блокируем закрытие книги, просто не синхронизируем
-        // на этот раз.
-      }
+    final progress = _currentProgress;
+    if (widget.isExcerpt || progress == _savedProgress) return;
+    try {
+      await ref.read(libraryApiProvider).updateProgress(
+            bookId: widget.bookId,
+            progress: progress,
+            updatedAt: DateTime.now(),
+          );
+      _savedProgress = progress;
+    } catch (_) {
+      // Нет сети — не блокируем закрытие книги, просто не синхронизируем
+      // на этот раз.
     }
+  }
+
+  Future<void> _saveProgressAndLeave() async {
+    if (_leaving) return;
+    _leaving = true;
+    await _saveProgress();
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -105,18 +126,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           onProgressChanged: (percent) => _currentProgress = percent,
         );
       default:
-        return const Center(child: Text('Формат не поддерживается'));
+        return Center(child: Text(AppLocalizations.of(context)!.readerFormatUnsupported));
     }
   }
 
   Future<void> _openToc() async {
+    final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: _toc.isEmpty
-            ? const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('Оглавление недоступно'),
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(l10n.readerTocUnavailable),
               )
             : ListView(
                 shrinkWrap: true,
@@ -139,14 +161,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final controller = _epubController;
     if (controller == null) return;
     final queryController = TextEditingController();
+    final l10n = AppLocalizations.of(context)!;
+    // Снаружи builder'а: StatefulBuilder перезапускает builder на каждый
+    // setSheetState, и локальная переменная внутри сбрасывалась бы в [].
+    var results = <EpubSearchResult>[];
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
-          List<EpubSearchResult> results = [];
-
           void runSearch(String value) {
             final query = value.trim();
             if (query.length < 2) {
@@ -170,10 +194,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 TextField(
                   controller: queryController,
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Поиск по тексту книги',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    hintText: l10n.readerSearchHint,
+                    prefixIcon: const Icon(Icons.search),
+                    border: const OutlineInputBorder(),
                   ),
                   onChanged: runSearch,
                 ),
@@ -181,9 +205,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 320),
                   child: results.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Text('Ничего не найдено'),
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Text(l10n.catalogEmptyResults),
                         )
                       : ListView.builder(
                           shrinkWrap: true,
@@ -213,6 +237,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   Future<void> _openBookmarks() async {
+    final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet<void>(
       context: context,
       builder: (context) => Consumer(
@@ -227,10 +252,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Закладки', style: Theme.of(context).textTheme.titleMedium),
+                      Text(l10n.readerBookmarksTitle, style: Theme.of(context).textTheme.titleMedium),
                       TextButton.icon(
                         icon: const Icon(Icons.add),
-                        label: const Text('На этой странице'),
+                        label: Text(l10n.readerBookmarkAddHere),
                         onPressed: _lastEpubPosition.isEmpty
                             ? null
                             : () => ref
@@ -245,14 +270,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     padding: EdgeInsets.all(24),
                     child: CircularProgressIndicator(),
                   ),
-                  error: (error, _) => const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('Не удалось загрузить закладки'),
+                  error: (error, _) => Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(l10n.readerBookmarksLoadError),
                   ),
                   data: (bookmarks) => bookmarks.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Text('Закладок пока нет'),
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Text(l10n.readerBookmarksEmpty),
                         )
                       : ConstrainedBox(
                           constraints: const BoxConstraints(maxHeight: 300),
@@ -263,7 +288,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                               final bookmark = bookmarks[index];
                               return ListTile(
                                 leading: const Icon(Icons.bookmark),
-                                title: Text('Закладка ${index + 1}'),
+                                title: Text(l10n.readerBookmarkTitle(index + 1)),
                                 trailing: IconButton(
                                   icon: const Icon(Icons.delete_outline),
                                   onPressed: () => ref
@@ -289,6 +314,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   Future<void> _openSettings() async {
+    final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet<void>(
       context: context,
       builder: (context) => Consumer(
@@ -304,7 +330,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Размер шрифта', style: Theme.of(context).textTheme.titleSmall),
+                  Text(l10n.readerFontSize, style: Theme.of(context).textTheme.titleSmall),
                   Row(
                     children: [
                       IconButton(
@@ -332,14 +358,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('Тема чтения', style: Theme.of(context).textTheme.titleSmall),
+                  Text(l10n.readerTheme, style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     children: [
                       for (final mode in ReaderThemeMode.values)
                         ChoiceChip(
-                          label: Text(mode.label),
+                          label: Text(mode.label(l10n)),
                           selected: settings.theme == mode,
                           onSelected: (_) => notifier.setTheme(mode),
                         ),
@@ -349,7 +375,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Непрерывная прокрутка'),
+                      title: Text(l10n.readerContinuousScroll),
                       value: settings.continuousScroll,
                       onChanged: (value) => notifier.setContinuousScroll(value),
                     ),
@@ -368,6 +394,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final fileAsync = ref.watch(
       readerFileProvider((bookId: widget.bookId, format: widget.format)),
     );
+    final l10n = AppLocalizations.of(context)!;
 
     return PopScope(
       canPop: false,
@@ -382,25 +409,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             if (widget.format == 'epub') ...[
               IconButton(
                 icon: const Icon(Icons.search),
-                tooltip: 'Поиск по тексту',
+                tooltip: l10n.readerSearchTooltip,
                 onPressed: _openSearch,
               ),
               IconButton(
                 icon: const Icon(Icons.toc),
-                tooltip: 'Оглавление',
+                tooltip: l10n.readerTocTooltip,
                 onPressed: _openToc,
               ),
               if (!widget.isExcerpt)
                 IconButton(
                   icon: const Icon(Icons.bookmark_border),
-                  tooltip: 'Закладки',
+                  tooltip: l10n.readerBookmarksTitle,
                   onPressed: _openBookmarks,
                 ),
             ],
             if (widget.format != 'pdf')
               IconButton(
                 icon: const Icon(Icons.text_fields),
-                tooltip: 'Настройки чтения',
+                tooltip: l10n.readerSettingsTooltip,
                 onPressed: _openSettings,
               ),
           ],
@@ -411,13 +438,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Не удалось загрузить файл книги'),
+                Text(l10n.readerFileLoadError),
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () => ref.invalidate(
                     readerFileProvider((bookId: widget.bookId, format: widget.format)),
                   ),
-                  child: const Text('Повторить'),
+                  child: Text(l10n.commonRetry),
                 ),
               ],
             ),

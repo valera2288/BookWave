@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Author, Book, Genre
+from .validators import validate_isbn_format
 
 
 class AuthorSerializer(serializers.ModelSerializer):
@@ -80,12 +81,18 @@ class BookDetailSerializer(serializers.ModelSerializer):
 
 
 class BookAdminSerializer(serializers.ModelSerializer):
-    """CRUD для админ-панели. `is_active`/`deleted_at` сюда намеренно не
-    входят — их нет в форме добавления/редактирования книги по ТЗ, мягкое
-    удаление отдельным действием (см. BookAdminViewSet.destroy)."""
+    """CRUD для админ-панели. `is_active` — только для чтения (пометка в
+    списке), `deleted_at` не входит: в форме книги по ТЗ их нет, мягкое
+    удаление — отдельным действием (см. BookAdminDetailView.destroy)."""
 
-    authors = serializers.PrimaryKeyRelatedField(many=True, queryset=Author.objects.all())
-    genres = serializers.PrimaryKeyRelatedField(many=True, queryset=Genre.objects.all())
+    # allow_empty=False — автор и жанр обязательны (ТЗ, форма книги); по
+    # умолчанию many=True пропускает пустой список.
+    authors = serializers.PrimaryKeyRelatedField(
+        many=True, allow_empty=False, queryset=Author.objects.all()
+    )
+    genres = serializers.PrimaryKeyRelatedField(
+        many=True, allow_empty=False, queryset=Genre.objects.all()
+    )
 
     class Meta:
         model = Book
@@ -105,4 +112,18 @@ class BookAdminSerializer(serializers.ModelSerializer):
             "epub_file",
             "pdf_file",
             "fb2_file",
+            "is_active",
         ]
+        # Только для отображения в списке (пометка «удалена») — менять его
+        # можно лишь мягким удалением (BookAdminDetailView.destroy).
+        read_only_fields = ["is_active"]
+
+    def validate_isbn(self, value):
+        # Часть сидовых книг в базе имеет нестандартные тестовые ISBN — не
+        # блокируем их редактирование, если сам ISBN не менялся (см.
+        # докстринг validate_isbn_format). Для новых книг и реальных правок
+        # ISBN проверка обязательна.
+        if self.instance and self.instance.isbn == value:
+            return value
+        validate_isbn_format(value)
+        return value

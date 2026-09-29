@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/auth_exception.dart';
 import 'password_reset_confirm_screen.dart';
 
@@ -45,15 +46,16 @@ class _PasswordResetRequestScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Сброс пароля')),
+      appBar: AppBar(title: Text(l10n.authResetTitle)),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: _sent ? _buildSentState(context) : _buildFormState(),
+              child: _sent ? _buildSentState(context, l10n) : _buildFormState(l10n),
             ),
           ),
         ),
@@ -61,15 +63,13 @@ class _PasswordResetRequestScreenState
     );
   }
 
-  Widget _buildFormState() {
+  Widget _buildFormState(AppLocalizations l10n) {
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Укажите e-mail, указанный при регистрации — пришлём ссылку для сброса пароля.',
-          ),
+          Text(l10n.authResetInstructions),
           const SizedBox(height: 24),
           TextFormField(
             controller: _emailController,
@@ -77,7 +77,7 @@ class _PasswordResetRequestScreenState
             autofillHints: const [AutofillHints.email],
             decoration: const InputDecoration(labelText: 'E-mail'),
             validator: (value) =>
-                (value == null || !value.contains('@')) ? 'Введите корректный e-mail' : null,
+                (value == null || !value.contains('@')) ? l10n.authEmailInvalid : null,
           ),
           const SizedBox(height: 24),
           FilledButton(
@@ -88,30 +88,26 @@ class _PasswordResetRequestScreenState
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Отправить'),
+                : Text(l10n.authSend),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSentState(BuildContext context) {
+  Widget _buildSentState(BuildContext context, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Icon(Icons.mark_email_read_outlined, size: 48),
         const SizedBox(height: 16),
-        const Text(
-          'Если такой e-mail зарегистрирован, на него отправлено письмо со ссылкой '
-          'для сброса пароля. Откройте ссылку из письма на этом устройстве — форма '
-          'нового пароля откроется автоматически.',
-        ),
+        Text(l10n.authResetSentMessage),
         const SizedBox(height: 24),
         TextButton(
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const PasswordResetConfirmScreen()),
           ),
-          child: const Text('Ссылка не открылась — ввести токен вручную'),
+          child: Text(l10n.authResetManualTokenLink),
         ),
       ],
     );

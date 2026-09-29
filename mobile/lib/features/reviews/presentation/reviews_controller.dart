@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../domain/review.dart';
 
 class ReviewsState {
@@ -46,7 +47,11 @@ class ReviewsController extends FamilyAsyncNotifier<ReviewsState, int> {
     _page = 1;
     final api = ref.read(reviewsApiProvider);
     final page = await api.fetchReviews(bookId: bookId, page: 1);
-    final mine = await api.fetchMyReview(bookId);
+    // Список отзывов виден и гостю (ТЗ), а вот «мой отзыв» — только
+    // авторизованному, иначе эндпоинт ответит 401 и обвалит весь блок
+    // отзывов на карточке книги вместо того, чтобы просто их показать.
+    final user = await ref.watch(authControllerProvider.future);
+    final mine = user == null ? null : await api.fetchMyReview(bookId);
     return ReviewsState(reviews: page.reviews, myReview: mine, hasMore: page.hasMore);
   }
 

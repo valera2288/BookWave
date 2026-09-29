@@ -1,13 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../auth/presentation/auth_controller.dart';
 
 /// Id избранных книг текущего пользователя — этого достаточно, чтобы
 /// отрисовать состояние сердечка на карточке/детали книги (сам список
 /// «Избранное» — отдельный экран в Phase 9, вместе с профилем).
 class FavoritesController extends AsyncNotifier<Set<int>> {
   @override
-  Future<Set<int>> build() {
+  Future<Set<int>> build() async {
+    // Гость не авторизован — эндпоинт всё равно ответит 401, не тратим на
+    // него запрос и просто считаем список избранного пустым.
+    final user = await ref.watch(authControllerProvider.future);
+    if (user == null) return const <int>{};
     return ref.read(favoritesApiProvider).fetchFavoriteBookIds();
   }
 

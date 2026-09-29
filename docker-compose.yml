@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:17
     restart: unless-stopped
     env_file:
       - backend/.env
@@ -9,5 +9,44 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - backend/.env
+    environment:
+      # Переопределяет значения из backend/.env, рассчитанные на локальный
+      # venv-дев (см. ARCHITECTURE.md, «Развёртывание») — здесь БД видна по
+      # имени сервиса, а не по host/порту хост-машины, и нет реального
+      # TLS-терминатора перед Nginx.
+      DJANGO_ENV: prod
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      SECURE_SSL_REDIRECT: "False"
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_media:/app/media
+      - backend_static:/app/staticfiles
+
+  admin-panel:
+    build:
+      context: ./admin-panel
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    volumes:
+      - backend_media:/backend-media:ro
+      - backend_static:/backend-static:ro
+
 volumes:
   postgres_data:
+  backend_media:
+  backend_static:

@@ -83,8 +83,11 @@ class AuthInterceptor extends Interceptor {
       final newAccessToken = response.data['access'] as String;
       await _storage.saveTokens(accessToken: newAccessToken, refreshToken: refreshToken);
       return newAccessToken;
-    } on DioException {
-      await _storage.clear();
+    } on DioException catch (e) {
+      // Стираем токены, только если сервер отверг refresh-токен. Без ответа
+      // (нет сети) сессия остаётся — повторим, когда связь появится.
+      final status = e.response?.statusCode;
+      if (status == 400 || status == 401) await _storage.clear();
       return null;
     }
   }

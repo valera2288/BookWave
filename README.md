@@ -78,11 +78,9 @@ BookWave/
 
 ## Запуск
 
-Скаффолдинг (Phase 1 из [PLAN.md](PLAN.md)) завершён — все три части
-поднимаются как пустой каркас. Phase 2 (модели данных и auth) тоже
-завершена на backend — JWT-регистрация/вход/сброс пароля уже работают
-через API. Экранов в admin-panel/mobile пока нет, они появляются по
-фазам `PLAN.md`.
+Все три части реализованы (фазы 1–11 [PLAN.md](PLAN.md)). Ниже — запуск
+для разработки; установка и удаление для конечного пользователя — в
+[USER_GUIDE.md](USER_GUIDE.md), разделы 3–4.
 
 ### Backend (Django + DRF)
 
@@ -99,6 +97,20 @@ python manage.py runserver
 ```
 
 Проверить: `http://localhost:8000/admin/` открывается.
+
+### Весь стек одной командой (Docker)
+
+Backend + admin-panel + PostgreSQL поднимаются вместе через Nginx-прокси
+(схема — ARCHITECTURE.md, «Развёртывание»). Реального домена/HTTPS нет —
+локальный демо-контур:
+
+```
+docker compose up -d --build
+```
+
+Открыть `http://localhost:8080/` (admin-panel), `http://localhost:8080/admin/`
+(Django-админка, только для баннеров). Mobile — отдельно, через Flutter
+(см. ниже), в докер не входит.
 
 ### Admin-panel (React + Vite)
 
@@ -117,8 +129,9 @@ flutter pub get
 copy .env.example .env
 ```
 
-`.env` для эмулятора Android — `API_BASE_URL=http://10.0.2.2:8000/api`
-(loopback на хост), для desktop/web — `http://localhost:8000/api`. Затем:
+Адрес бэкенда выбирается автоматически (`lib/core/api/api_client.dart`):
+`localhost` для desktop-сборки, LAN IP хоста для Android (BlueStacks).
+`API_BASE_URL` в `.env` задаётся, только если он не подходит. Затем:
 
 ```
 flutter run

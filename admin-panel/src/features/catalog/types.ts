@@ -24,4 +24,5 @@ export interface BookAdmin {
   epub_file: string | null;
   pdf_file: string | null;
   fb2_file: string | null;
+  is_active: boolean;
 }

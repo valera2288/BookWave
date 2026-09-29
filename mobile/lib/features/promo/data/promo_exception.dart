@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/current_locale.dart';
+import '../../../l10n/app_localizations.dart';
+
 class PromoException implements Exception {
   PromoException(this.message);
 
@@ -10,7 +13,7 @@ class PromoException implements Exception {
     if (data is Map && data['detail'] is String) {
       return PromoException(data['detail'] as String);
     }
-    return PromoException('Не удалось проверить промокод. Проверьте соединение.');
+    return PromoException(lookupAppLocalizations(currentAppLocale).exceptionPromoGeneric);
   }
 
   @override

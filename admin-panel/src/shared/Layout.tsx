@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { logout } from "../features/auth/auth";
 import ErrorBoundary from "./ErrorBoundary";
+import type { ThemeMode } from "./useTheme";
 
 const NAV_ITEMS = [
   { to: "/orders", label: "Заказы" },
@@ -13,7 +14,18 @@ const NAV_ITEMS = [
   { to: "/reports", label: "Отчёты" },
 ];
 
-export default function Layout() {
+const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: "light", label: "Светлая" },
+  { value: "dark", label: "Тёмная" },
+  { value: "system", label: "Системная" },
+];
+
+interface LayoutProps {
+  theme: ThemeMode;
+  setTheme: (mode: ThemeMode) => void;
+}
+
+export default function Layout({ theme, setTheme }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,6 +48,18 @@ export default function Layout() {
             {item.label}
           </NavLink>
         ))}
+        <div className="theme-switch" role="group" aria-label="Тема оформления">
+          {THEME_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={theme === option.value ? "active" : undefined}
+              onClick={() => setTheme(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <button type="button" className="ghost logout-btn" onClick={handleLogout}>
           Выйти
         </button>

@@ -41,6 +41,16 @@ class PromoCodeAdminSerializer(serializers.ModelSerializer):
             return "exhausted"
         return "active"
 
+    def validate_code(self, value):
+        # Применение промокода ищет его без учёта регистра (`code__iexact`) —
+        # "SALE" и "sale" одновременно дали бы 500 при проверке.
+        duplicates = PromoCode.objects.filter(code__iexact=value)
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise serializers.ValidationError("Промокод с таким кодом уже существует.")
+        return value
+
     def validate(self, attrs):
         # `PromoCode.clean()` уже содержит это правило, но ModelSerializer
         # не вызывает model.clean() автоматически — без дублирования здесь
