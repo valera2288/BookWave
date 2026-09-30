@@ -1,7 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- В debug/profile-манифестах разрешение уже есть; без него в release-сборке
+         приложение не выходит в сеть. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="BookWave"
         android:name="${applicationName}"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
