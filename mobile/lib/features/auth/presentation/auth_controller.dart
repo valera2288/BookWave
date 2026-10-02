@@ -105,8 +105,8 @@ class AuthController extends AsyncNotifier<AppUser?> {
 
   /// Best-effort побочный эффект — сбой регистрации/отвязки токена не
   /// должен ронять вход/выход из аккаунта, поэтому ошибки не пробрасываются.
-  /// Windows-десктоп — только dev-тестирование (см. AGENTS.md о BlueStacks
-  /// как единственной Android-цели), не реальная push-платформа, поэтому
+  /// Windows-десктоп — только dev-тестирование (BlueStacks —
+  /// единственная Android-цель), не реальная push-платформа, поэтому
   /// токен там не регистрируем — `DeviceToken.platform` на бэкенде вообще
   /// не знает значения "windows".
   Future<void> _registerDeviceToken() async {

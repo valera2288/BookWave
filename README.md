@@ -1,8 +1,6 @@
 # BookWave
 
 Веб- и мобильное приложение для продажи и чтения электронных книг.
-Спецификация — [BookWave_TZ.md](BookWave_TZ.md), архитектура —
-[ARCHITECTURE.md](ARCHITECTURE.md), план внедрения — [PLAN.md](PLAN.md).
 
 ## Структура проекта
 
@@ -11,8 +9,6 @@
 
 ```
 BookWave/
-├── ARCHITECTURE.md
-├── BookWave_TZ.md
 ├── README.md
 │
 ├── backend/                        # Django + DRF
@@ -27,7 +23,7 @@ BookWave/
 │   │   ├── urls.py
 │   │   ├── wsgi.py
 │   │   └── asgi.py
-│   ├── apps/                       # domain-oriented apps из ARCHITECTURE.md
+│   ├── apps/                       # domain-oriented apps
 │   │   ├── users/                  # auth, роли, JWT lifecycle, профиль
 │   │   ├── catalog/                # books, genres, authors, book_authors, book_genres
 │   │   ├── files/                  # upload + защищённая выдача (X-Accel-Redirect)
@@ -78,7 +74,7 @@ BookWave/
 
 ## Запуск
 
-Все три части реализованы (фазы 1–11 [PLAN.md](PLAN.md)). Ниже — запуск
+Все три части реализованы (фазы 1–11). Ниже — запуск
 для разработки; установка и удаление для конечного пользователя — в
 [USER_GUIDE.md](USER_GUIDE.md), разделы 3–4.
 
@@ -100,8 +96,8 @@ python manage.py runserver
 
 ### Весь стек одной командой (Docker)
 
-Backend + admin-panel + PostgreSQL поднимаются вместе через Nginx-прокси
-(схема — ARCHITECTURE.md, «Развёртывание»). Реального домена/HTTPS нет —
+Backend + admin-panel + PostgreSQL поднимаются вместе через Nginx-прокси.
+Реального домена/HTTPS нет —
 локальный демо-контур:
 
 ```
