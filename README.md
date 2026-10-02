@@ -1,114 +1,131 @@
 # BookWave
 
-Веб- и мобильное приложение для продажи и чтения электронных книг.
+Магазин электронных книг со встроенной читалкой: читатели покупают и читают книги в мобильном приложении, а администратор управляет каталогом, заказами и отчётами через веб-панель.
+
+<p align="center">
+  <img src="docs/screenshots/mob_13_home_reader.png" width="190" alt="Главная">
+  <img src="docs/screenshots/mob_08_catalog.png" width="190" alt="Каталог">
+  <img src="docs/screenshots/mob_11_book_detail.png" width="190" alt="Карточка книги">
+  <img src="docs/screenshots/mob_20_reader.png" width="190" alt="Читалка">
+</p>
+
+## Возможности
+
+**Читатель (мобильное приложение, Android)**
+
+- регистрация, вход, восстановление пароля по письму; гостевой режим с просмотром каталога;
+- каталог с поиском по названию, автору и ISBN, фильтрами (жанр, цена, язык, рейтинг) и сортировкой;
+- карточка книги с отзывами и бесплатным ознакомительным фрагментом;
+- избранное, корзина, промокоды, оформление заказа с имитацией оплаты и электронным чеком;
+- личная библиотека с прогрессом чтения и встроенная читалка: оглавление, закладки, поиск по тексту, размер шрифта, светлая, тёмная и сепия темы;
+- отзывы и оценки на купленные книги, история заказов, смена темы и языка (русский и английский).
+
+**Администратор (веб-панель)**
+
+- каталог книг с загрузкой обложек и файлов EPUB, PDF, FB2;
+- справочники жанров и авторов, промокоды, заказы со сменой статуса, модерация отзывов;
+- отчёты о продажах с выгрузкой в Excel и CSV.
+
+Подробное описание со скриншотами всех экранов — в [руководстве пользователя](USER_GUIDE.md).
+
+## Скриншоты
+
+| Мобильное приложение | | | |
+|---|---|---|---|
+| <img src="docs/screenshots/mob_04_login.png" width="170"> | <img src="docs/screenshots/mob_16_cart_promo.png" width="170"> | <img src="docs/screenshots/mob_19_library.png" width="170"> | <img src="docs/screenshots/mob_26_settings.png" width="170"> |
+| Вход | Корзина с промокодом | Библиотека | Настройки |
+
+| Веб-панель администратора | |
+|---|---|
+| <img src="docs/screenshots/admin_02_orders.png" width="430"> | <img src="docs/screenshots/admin_11_reports.png" width="430"> |
+| Заказы | Отчёт о продажах |
+
+## Технологии
+
+| Часть | Стек |
+|---|---|
+| Серверная часть | Python 3.13, Django 6.1, Django REST Framework 3.18, JWT (simplejwt), PostgreSQL 17, Gunicorn |
+| Мобильное приложение | Flutter (Dart 3.12), Riverpod, Dio, flutter_secure_storage, собственный разбор EPUB |
+| Веб-панель | React 19, TypeScript, Vite, React Router, Axios |
+| Развёртывание | Docker Compose, Nginx |
+
+Несколько решений, на которые стоит обратить внимание:
+
+- аутентификация по JWT: access-токен живёт 15 минут, refresh-токен 7 дней, смена пароля завершает остальные сессии;
+- файлы книг не отдаются по прямым ссылкам: сервер проверяет, что книга есть в библиотеке пользователя;
+- оформление заказа выполняется одной транзакцией, при ошибке изменения откатываются;
+- прогресс чтения синхронизируется между устройствами, при конфликте побеждает более поздняя запись.
 
 ## Структура проекта
 
-Монорепозиторий: backend, admin-панель и мобильное приложение — в одном
-корне, каждое в своей папке.
-
 ```
 BookWave/
+├── backend/            # Django + DRF
+│   ├── config/         # настройки (base, dev, prod), urls, wsgi
+│   └── apps/           # users, catalog, files, favorites, cart, orders, promo,
+│                       # library, bookmarks, reviews, reports, notifications, banners
+├── admin-panel/        # React + TypeScript + Vite
+│   └── src/features/   # auth, catalog, orders, promo, reviews, reports
+├── mobile/             # Flutter
+│   └── lib/
+│       ├── core/       # сеть, хранилище, тема, провайдеры
+│       └── features/   # auth, home, catalog, book_details, favorites, cart, promo,
+│                       # orders, library, reader, reviews, profile, settings, onboarding
+├── docs/screenshots/   # скриншоты для документации
+├── docker-compose.yml
 ├── README.md
-│
-├── backend/                        # Django + DRF
-│   ├── manage.py
-│   ├── requirements.txt
-│   ├── .env.example
-│   ├── config/                     # settings, urls, wsgi/asgi
-│   │   ├── settings/
-│   │   │   ├── base.py
-│   │   │   ├── dev.py
-│   │   │   └── prod.py
-│   │   ├── urls.py
-│   │   ├── wsgi.py
-│   │   └── asgi.py
-│   ├── apps/                       # domain-oriented apps
-│   │   ├── users/                  # auth, роли, JWT lifecycle, профиль
-│   │   ├── catalog/                # books, genres, authors, book_authors, book_genres
-│   │   ├── files/                  # upload + защищённая выдача (X-Accel-Redirect)
-│   │   ├── favorites/
-│   │   ├── cart/
-│   │   ├── orders/                 # orders, order_items, атомарный checkout
-│   │   ├── promo/
-│   │   ├── library/                # user_library, progress sync
-│   │   ├── bookmarks/
-│   │   ├── reviews/
-│   │   ├── reports/                # статистика, экспорт xlsx/csv
-│   │   ├── notifications/          # email + push, preferences, device_tokens
-│   │   └── banners/
-│   │       # паттерн на каждый app сейчас (Phase 1):
-│   │       #   models.py admin.py views.py urls.py tests.py migrations/
-│   │       # serializers.py/permissions.py/services.py добавляются
-│   │       #   вместе с первой реальной фичей app'а (Phase 2+)
-│   ├── media/                      # локальное файловое хранилище (dev, gitignore)
-│   └── static/
-│
-├── admin-panel/                    # React + TypeScript + Vite SPA
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── public/
-│   └── src/
-│       ├── main.tsx
-│       ├── App.tsx                 # роутинг (react-router-dom), Phase 1 — placeholder
-│       └── api/
-│           └── client.ts           # axios-инстанс
-│       # routes/, components/, features/{auth,orders,catalog,promo,
-│       #   reviews,reports}/ — появятся на Phase 10 вместе с UI разделов
-│
-└── mobile/                         # Flutter, feature-first, Riverpod
-    ├── pubspec.yaml
-    ├── android/ ios/ web/ ...      # платформенные проекты (сгенерированы flutter create)
-    └── lib/
-        ├── main.dart
-        ├── app.dart                # MaterialApp, тема, Phase 1 — placeholder-экран
-        └── core/                   # сквозные вещи не по фичам
-            ├── api/                # Dio-клиент
-            ├── theme/              # светлая/тёмная тема
-            ├── storage/            # SharedPreferences (тема/язык) + secure storage (JWT)
-            └── di/                 # корневые Riverpod-провайдеры
-        # lib/features/{onboarding,auth,home,catalog,book_details,favorites,
-        #   cart,checkout,library,reader,orders,reviews,profile}/ — появятся
-        #   по мере реализации, начиная с auth на Phase 2
+└── USER_GUIDE.md
 ```
 
-## Запуск
+Бэкенд разделён на приложения по предметным областям, мобильное приложение и веб-панель устроены по фичам: каждая содержит свой слой данных, логику и экраны.
 
-Все три части реализованы (фазы 1–11). Ниже — запуск
-для разработки; установка и удаление для конечного пользователя — в
-[USER_GUIDE.md](USER_GUIDE.md), разделы 3–4.
+## Быстрый старт
 
-### Backend (Django + DRF)
+Нужен Docker Desktop (Windows) или Docker Engine с Compose (Linux).
+
+1. Подготовьте настройки сервера:
+
+   ```
+   copy backend\.env.example backend\.env
+   ```
+
+   В `backend/.env` задайте как минимум `SECRET_KEY` (длинная случайная строка) и пароль базы `POSTGRES_PASSWORD`. Файл `.env` в репозиторий не попадает.
+2. Запустите всё одной командой:
+
+   ```
+   docker compose up -d --build
+   ```
+
+   Поднимутся PostgreSQL, backend (миграции применяются при старте) и Nginx с веб-панелью.
+3. Создайте администратора:
+
+   ```
+   docker compose exec backend python manage.py createsuperuser
+   ```
+
+4. Откройте `http://localhost:8080/` и войдите под созданным e-mail. API доступно по адресу `http://localhost:8000/api/`.
+
+В демонстрационном контуре письма (сброс пароля, электронный чек) не отправляются по почте, а выводятся в журнал: `docker compose logs backend`.
+
+## Запуск для разработки
+
+### Серверная часть
 
 ```
 cd backend
 python -m venv venv
 venv\Scripts\activate          # Windows
 pip install -r requirements.txt
-copy .env.example .env         # при необходимости отредактировать значения
+copy .env.example .env         # отредактируйте значения
 
-docker compose up -d           # поднять Postgres (нужен установленный Docker Desktop)
+docker compose up -d postgres  # только база данных
 python manage.py migrate
 python manage.py runserver
 ```
 
-Проверить: `http://localhost:8000/admin/` открывается.
+Проверка: `http://localhost:8000/admin/` открывается.
 
-### Весь стек одной командой (Docker)
-
-Backend + admin-panel + PostgreSQL поднимаются вместе через Nginx-прокси.
-Реального домена/HTTPS нет —
-локальный демо-контур:
-
-```
-docker compose up -d --build
-```
-
-Открыть `http://localhost:8080/` (admin-panel), `http://localhost:8080/admin/`
-(Django-админка, только для баннеров). Mobile — отдельно, через Flutter
-(см. ниже), в докер не входит.
-
-### Admin-panel (React + Vite)
+### Веб-панель
 
 ```
 cd admin-panel
@@ -117,18 +134,49 @@ copy .env.example .env
 npm run dev
 ```
 
-### Mobile (Flutter)
+### Мобильное приложение
 
 ```
 cd mobile
 flutter pub get
 copy .env.example .env
-```
-
-Адрес бэкенда выбирается автоматически (`lib/core/api/api_client.dart`):
-`localhost` для desktop-сборки, LAN IP хоста для Android (BlueStacks).
-`API_BASE_URL` в `.env` задаётся, только если он не подходит. Затем:
-
-```
 flutter run
 ```
+
+Адрес сервера выбирается автоматически (`lib/core/api/api_client.dart`): для desktop-сборки это `localhost`, для Android — IP компьютера в локальной сети. Если он не подходит, например IP сменился, задайте `API_BASE_URL=http://<адрес>:8000/api` в `mobile/.env`.
+
+Сборка APK для установки на устройство:
+
+```
+flutter build apk --release
+```
+
+Файл появится в `mobile/build/app/outputs/flutter-apk/app-release.apk` (Android 7.0 и новее).
+
+## Тесты
+
+Автотесты бэкенда:
+
+```
+cd backend
+python manage.py test
+```
+
+Они проверяют расчёт и валидацию промокодов, атомарность оформления заказа, доступ к файлам книг и синхронизацию прогресса чтения.
+
+## Настройки окружения
+
+Основные переменные `backend/.env` (шаблон — `backend/.env.example`):
+
+| Переменная | Назначение |
+|---|---|
+| `DJANGO_ENV` | режим работы: `dev` или `prod` |
+| `SECRET_KEY` | секретный ключ Django |
+| `DEBUG` | режим отладки |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT` | подключение к базе данных |
+| `ALLOWED_HOSTS` | допустимые адреса сервера через запятую |
+| `CORS_ALLOWED_ORIGINS` | адреса, с которых разрешены запросы из браузера |
+
+## Документация
+
+- [Руководство пользователя](USER_GUIDE.md) — установка, работа с приложением и веб-панелью, частые неполадки, со скриншотами.
