@@ -8,6 +8,13 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # backend ждёт, пока база реально начнёт принимать подключения,
+    # иначе migrate в entrypoint падает на первом старте.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   backend:
     build: ./backend
@@ -25,7 +32,8 @@ services:
       SECURE_SSL_REDIRECT: "False"
       EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:

@@ -32,3 +32,9 @@ if settings.DEBUG:
     urlpatterns += [
         re_path(PUBLIC_MEDIA_PATTERN, serve, {"document_root": settings.MEDIA_ROOT}),
     ]
+else:
+    # Django-админка открывается и напрямую на :8000 (мимо Nginx, который раздаёт
+    # /static/ на :8080), поэтому статику собранной админки отдаёт сам Django.
+    urlpatterns += [
+        re_path(r"^static/(?P<path>.*)$", serve, {"document_root": settings.STATIC_ROOT}),
+    ]

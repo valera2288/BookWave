@@ -4,10 +4,10 @@ from .base import *  # noqa: F401,F403
 
 DEBUG = True
 
-# 192.168.0.12 — LAN IP хост-машины, нужен для доступа с BlueStacks
-# (единственная Android-цель проекта): у него нет алиаса
-# localhost/10.0.2.2 к хосту, только реальный IP в локальной сети.
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.0.12"]
+# Dev-режим: принимаем любой адрес, под которым сервер виден клиентам
+# (localhost, 10.0.2.2 для эмулятора, LAN IP компьютера и т. д.) — IP хоста
+# в сети меняется, перечислять их вручную неудобно.
+ALLOWED_HOSTS = ["*"]
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
